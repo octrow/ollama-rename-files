@@ -1,0 +1,21 @@
+# Copy to <repo>/.github/dependabot.yml. Keep the github-actions entry: it bumps the SHA pins
+# in workflows (and their `# vX.Y.Z` comments). Swap `pip` for npm/cargo/gomod/uv as the repo needs.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule: { interval: weekly }
+    cooldown: { default-days: 7 }   # skip releases younger than a week (hijacked-release window)
+    groups:
+      actions: { patterns: ["*"] }
+  - package-ecosystem: uv
+    directory: /
+    schedule: { interval: weekly }
+    cooldown: { default-days: 7 }   # skip releases younger than a week (hijacked-release window)
+    groups:
+      minor-and-patch: { update-types: [minor, patch] }
+    # App pinned to a framework's peer ranges (Payload, Next, Angular...)? Majors there break the
+    # install and are upgraded by hand with the framework; uncomment to stop those PRs.
+    # ignore:
+    #   - dependency-name: "*"
+    #     update-types: ["version-update:semver-major"]

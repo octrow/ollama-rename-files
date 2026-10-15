@@ -1,0 +1,5 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Security vulnerability
+    url: https://github.com/octrow/ollama-rename-files/security/advisories/new
+    about: Report privately, not in a public issue.

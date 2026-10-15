@@ -1,0 +1,35 @@
+name: Bug report
+description: Something renamed wrong, crashed or didn't start
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you did, what you expected, what you got. Paste the error output.
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version and install method
+      placeholder: 0.2.0, install.sh / binary / from source
+    validations:
+      required: true
+  - type: input
+    id: os
+    attributes:
+      label: OS
+      placeholder: Ubuntu 24.04, macOS 15, Windows 11
+    validations:
+      required: true
+  - type: input
+    id: model
+    attributes:
+      label: Ollama version and model
+      placeholder: ollama 0.12, qwen2.5-coder:7b
+  - type: dropdown
+    id: mode
+    attributes:
+      label: Mode
+      options: [GUI, CLI interactive, CLI with flags]

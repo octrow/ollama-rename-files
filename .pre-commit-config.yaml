@@ -1,0 +1,24 @@
+# Copy to <repo>/.pre-commit-config.yaml, then: pre-commit install && pre-commit run --all-files
+# Keep revs current with `pre-commit autoupdate` (or the pre-commit.ci bot).
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:                    # checks only; no whitespace fixers, so the first run on an old repo isn't a mass rewrite
+      - id: check-added-large-files
+        args: [--maxkb=1000]  # heavy data belongs in a release asset or download, not in every clone
+      - id: check-merge-conflict
+      - id: check-case-conflict  # breaks clones on macOS and Windows
+      - id: check-yaml
+      - id: check-toml
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.30.1
+    hooks:
+      - id: gitleaks          # staged changes only; CI (security.yml) scans the whole history
+  - repo: https://github.com/zizmorcore/zizmor-pre-commit
+    rev: v1.30.1
+    hooks:
+      - id: zizmor            # workflow security: template injection, unpinned actions, pull_request_target
+  - repo: https://github.com/rhysd/actionlint
+    rev: v1.7.12
+    hooks:
+      - id: actionlint        # workflow syntax and shellcheck of run: steps
