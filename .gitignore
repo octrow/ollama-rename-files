@@ -1,3 +1,16 @@
 /.venv/
 /.idea/
 __pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+/build/
+/dist/
+*.egg-info/
+*.spec
+.env
+.env.*
+# local agent tooling
+/.agents/
+/.claude/
+skills-lock.json
