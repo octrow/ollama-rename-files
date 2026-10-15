@@ -72,3 +72,13 @@ def test_discover_keeps_whole_leading_word(tmp_path):
     for name in ("Untitled.md", "Untitled 1.md"):
         (tmp_path / name).write_text("x")
     assert InteractiveFileRenamer(base_dir=tmp_path).discover_file_patterns() == [(("Untitled", ".md"), 2)]
+
+
+def test_clean_model_response_ignores_fence_language_tag():
+    reply = "```md\nsnippet - create - utils - retry.md\n```"
+    assert clean_model_response(reply) == "snippet - create - utils - retry.md"
+
+
+def test_sanitize_filename_drops_commas():
+    name = sanitize_filename("idea - respect color-scheme, keep palette", ".txt")
+    assert name == "idea-respect-color-scheme-keep-palette.txt"

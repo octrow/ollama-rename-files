@@ -53,14 +53,16 @@ FailedFiles = list[tuple[str, str]]
 def clean_model_response(text: str) -> str:
     """Extract the bare file name from a model reply (drops <think> blocks, fences, extra lines)."""
     text = re.sub(r"<think>.*?(</think>|$)", "", text, flags=re.DOTALL)
-    lines = [line.strip().strip("`*\"'") for line in text.splitlines()]
-    lines = [line for line in lines if line and not line.startswith("```")]
+    lines = [line.strip() for line in text.splitlines()]
+    # drop fence lines before stripping backticks, or "```md" leaves "md" behind
+    lines = [line.strip("`*\"'") for line in lines if not line.startswith("```")]
+    lines = [line for line in lines if line]
     return lines[0].lower() if lines else ""
 
 
 def sanitize_filename(suggested_name: str, original_ext: str, max_len: int = MAX_FILE_NAME_LENGTH) -> str:
     name = re.sub(r"\.\w+$", "", suggested_name)
-    name = name.replace('.', '').replace('`', '').replace("'", "")
+    name = re.sub(r"[.`',;]", "", name)
     name = re.sub(r'[<>/\\|?*:"+%!@]', "_", name)
     name = re.sub(r"\s+", "-", name)
     name = re.sub(r"-{2,}", "-", name)

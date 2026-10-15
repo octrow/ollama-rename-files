@@ -87,3 +87,10 @@ def test_choose_port_restarts_running_instance_on_yes(monkeypatch):
 def test_confirm_defaults_to_no_without_terminal(monkeypatch):
     monkeypatch.setattr("sys.stdin.isatty", lambda: False)
     assert gui.confirm("Restart? ") is False
+
+
+def test_set_directory_shows_home_as_tilde(tmp_path, monkeypatch):
+    monkeypatch.setenv("HOME", str(tmp_path))
+    (tmp_path / "inbox").mkdir()
+    response = gui.app.test_client().post('/set_directory', json={'directory': '~/inbox'})
+    assert response.json['directory'] == "~/inbox"

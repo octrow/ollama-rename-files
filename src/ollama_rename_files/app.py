@@ -57,6 +57,14 @@ def _backup_dir(name: str | None) -> Path | None:
     return path if path and path.is_dir() and path.name.startswith("backup_") else None
 
 
+def _display_path(path: Path) -> str:
+    """`~/notes` instead of the full home path, so the folder field stays readable."""
+    try:
+        return "~/" + path.resolve().relative_to(Path.home().resolve()).as_posix()
+    except ValueError:
+        return str(path)
+
+
 @app.route('/')
 def index():
     return render_template("index.html")
@@ -75,7 +83,7 @@ def set_directory():
     global current_dir
     current_dir = directory
     patterns = InteractiveFileRenamer(base_dir=directory).discover_file_patterns()
-    return jsonify({"directory": str(directory), "patterns": patterns})
+    return jsonify({"directory": _display_path(directory), "patterns": patterns})
 
 
 @app.get('/models')
