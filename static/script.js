@@ -1,119 +1,102 @@
-document.getElementById('set-dir-btn').addEventListener('click', async () => {
-    const directory = document.getElementById('directory').value;
-    try {
-        const response = await fetch('/set_directory', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ directory })
-        });
+const $ = (id) => document.getElementById(id);
 
-        if (!response.ok) {
-            const errorData = await response.json();
-            alert(`Error setting directory: ${errorData.error}`);
-        } else {
-            const result = await response.json();
-            alert(result.message);
-            // Fetch and display patterns after directory is set
-            fetchPatterns();
-        }
-    } catch (error) {
-        alert(`Error setting directory: ${error}`);
-    }
-});
+function showStatus(text, isError = false) {
+    $('status').textContent = text;
+    $('status').className = isError ? 'error' : '';
+}
 
-async function chooseDirectory() {
-    return new Promise((resolve, reject) => {
-      pywebview.api.chooseDirectory().then(resolve).catch(reject);
+async function postJson(url, body) {
+    const response = await fetch(url, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(body),
     });
-  }
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || response.statusText);
+    return data;
+}
 
-document.getElementById('choose-dir-btn').addEventListener('click', async () => {
-    try {
-        const directory = await chooseDirectory(); // Call the function to choose the dir
+function selectPattern(prefix, extension) {
+    $('prefix').value = prefix;
+    $('extension').value = extension;
+}
 
-        if (directory) {
-          const response = await fetch('/set_directory', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ directory })
-          });
-
-          if (!response.ok) {
-              const errorData = await response.json();
-              alert(`Error setting directory: ${errorData.error}`);
-          } else {
-              const result = await response.json();
-              document.getElementById('directory').value = result.directory; // Update display
-              alert(result.message);
-              fetchPatterns();
-          }
-        } else {
-          alert('No directory selected.'); // Handle cancellation
-        }
-
-    } catch (error) {
-        alert(`Error: ${error}`); // Generic error handling
+function renderPatterns(patterns) {
+    const container = $('patterns');
+    container.replaceChildren();
+    $('patterns-section').hidden = false;
+    if (patterns.length === 0) {
+        container.textContent = 'No files found.';
+        return;
     }
+    patterns.forEach(([[prefix, ext], count], i) => {
+        const label = document.createElement('label');
+        label.className = 'pattern';
+        const radio = document.createElement('input');
+        radio.type = 'radio';
+        radio.name = 'pattern';
+        radio.checked = i === 0;
+        radio.addEventListener('change', () => selectPattern(prefix, ext));
+        label.append(radio, ` ${prefix}*${ext} — ${count} files`);
+        container.appendChild(label);
+    });
+    selectPattern(...patterns[0][0]);
+}
 
-
-
-});
-
-
-
-async function fetchPatterns() {
+async function setDirectory(directory) {
     try {
-        const response = await fetch('/discover_patterns');
-        if (!response.ok) {
-            const errorData = await response.json();
-            alert(`Error fetching patterns: ${errorData.error}`);
-            return; // Stop execution if error
-        }
-        const patterns = await response.json();
-        const patternsDiv = document.getElementById('patterns');
-        patternsDiv.innerHTML = "<h2>Discovered Patterns:</h2>";
-        if (patterns.length === 0) {
-            patternsDiv.innerHTML += "<p>No patterns found.</p>";
-        } else {
-          const patternList = document.createElement('ul');
-          patterns.forEach(pattern => {
-            const listItem = document.createElement('li');
-            listItem.textContent = `${pattern[0][0]} (${pattern[1]} files)`;
-            patternList.appendChild(listItem);
-        });
-        patternsDiv.appendChild(patternList);
-
-        }
-
+        const result = await postJson('/set_directory', {directory});
+        $('directory').value = result.directory;
+        renderPatterns(result.patterns);
+        showStatus('');
     } catch (error) {
-        alert(`Error fetching patterns: ${error}`);
+        showStatus(`Error setting directory: ${error.message}`, true);
     }
 }
 
-document.getElementById('rename-btn').addEventListener('click', async () => {
+async function loadModels() {
     try {
-        const response = await fetch('/rename_files', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' }
-         }); // No body needed for this example
-
-        if (!response.ok) {  // Check for errors
-          const errorData = await response.json();
-          alert(`Error renaming files: ${errorData.error}`);
-          return;
-        }
-
-        const result = await response.json();
-        let message = `Renamed: ${result.renamed_count}, Failed: ${result.failed_count}`;
-        if (result.failed_files && result.failed_files.length > 0) {
-            message += "\nFailed Files:\n";
-            result.failed_files.forEach(file => {
-                message += `${file[0]}: ${file[1]}\n`;
-            });
-        }
-
-        alert(message);
+        const models = await (await fetch('/models')).json();
+        $('model').replaceChildren(...models.map((m) => new Option(m, m)));
+        if (models.length === 0) showStatus('No Ollama models found. Is Ollama running?', true);
     } catch (error) {
-        alert(`Error renaming files: ${error.message}`);
+        showStatus(`Error loading models: ${error.message}`, true);
+    }
+}
+
+$('set-dir-btn').addEventListener('click', () => setDirectory($('directory').value));
+$('directory').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') setDirectory($('directory').value);
+});
+
+$('choose-dir-btn').addEventListener('click', async () => {
+    if (!window.pywebview) {
+        showStatus('Folder picker is only available in the desktop app.', true);
+        return;
+    }
+    const directory = await window.pywebview.api.choose_directory();
+    if (directory) await setDirectory(directory);
+});
+
+$('rename-btn').addEventListener('click', async () => {
+    const buttons = ['rename-btn', 'set-dir-btn', 'choose-dir-btn'].map($);
+    buttons.forEach((b) => { b.disabled = true; });
+    showStatus('Renaming… this can take a while.');
+    try {
+        const result = await postJson('/rename_files', {
+            prefix: $('prefix').value,
+            extension: $('extension').value,
+            model: $('model').value,
+        });
+        const lines = [`Renamed: ${result.renamed_count}, failed: ${result.failed_count}`];
+        result.failed_files.forEach(([file, error]) => lines.push(`${file}: ${error}`));
+        showStatus(lines.join('\n'), result.failed_count > 0);
+        await setDirectory($('directory').value);
+    } catch (error) {
+        showStatus(`Error renaming files: ${error.message}`, true);
+    } finally {
+        buttons.forEach((b) => { b.disabled = false; });
     }
 });
+
+loadModels();

@@ -7,22 +7,35 @@
     <link rel="stylesheet" href="/static/styles.css">
 </head>
 <body>
-    <div id="app">
-        <h1>File Renamer</h1>
+<main id="app">
+    <h1>File Renamer</h1>
 
-        <input type="text" id="directory" placeholder="Enter directory path">
-        <button id="choose-dir-btn">Choose Directory</button> <button id="set-dir-btn">Set Directory</button>
+    <section>
+        <label for="directory">Directory</label>
+        <div class="row">
+            <input type="text" id="directory" placeholder="/path/to/folder">
+            <button id="choose-dir-btn" type="button" class="secondary">Browse…</button>
+            <button id="set-dir-btn" type="button">Scan</button>
+        </div>
+    </section>
 
+    <section id="patterns-section" hidden>
+        <h2>Pattern</h2>
         <div id="patterns"></div>
-        <button id="rename-btn">Rename Files</button>
-        <div id="results"></div>
-    </div>
-    <script>
-    window.addEventListener('pywebviewready', () => {  // Use pywebviewready
-      console.log("pywebview is ready!"); // Log to console when ready
-      // Now you can safely call pywebview.api functions
-    });
-    </script>
-    <script src="/static/script.js"></script>
+        <div class="row">
+            <input type="text" id="prefix" placeholder="prefix" aria-label="File prefix">
+            <input type="text" id="extension" placeholder=".txt" aria-label="File extension">
+        </div>
+    </section>
+
+    <section>
+        <label for="model">Model</label>
+        <select id="model"></select>
+    </section>
+
+    <button id="rename-btn" type="button">Rename files</button>
+    <div id="status" role="status" aria-live="polite"></div>
+</main>
+<script src="/static/script.js"></script>
 </body>
 </html>

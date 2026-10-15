@@ -1,0 +1,22 @@
+[project]
+name = "ollama-rename-files"
+version = "0.2.0"
+description = "Rename files by their content with a local Ollama model"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = ["ollama>=0.5.0", "flask>=3.0", "pywebview>=5.0"]
+
+[dependency-groups]
+dev = ["pytest>=8", "ruff>=0.6"]
+
+[tool.uv]
+package = false
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+
+[tool.ruff]
+line-length = 120
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "SIM", "BLE"]

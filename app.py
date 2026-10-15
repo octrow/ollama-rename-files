@@ -1,74 +1,68 @@
-import logging
-import sys
+import asyncio
+from pathlib import Path
 
 import webview
-from api import create_app
+from flask import Flask, jsonify, render_template, request
 
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s',
-                    handlers=[logging.StreamHandler(sys.stdout)])
-logger = logging.getLogger(__name__)
+from rename_files import DEFAULT_MODEL, InteractiveFileRenamer, list_ollama_models
 
-
-def start_server():
-    app = create_app()
-    app.run(port=5000, debug=True, use_reloader=False)
-
-    @webview.expose()  # Expose the API function here
-    def chooseDirectory():
-        result = webview.windows[0].create_file_dialog(webview.FOLDER_DIALOG)
-        if result and len(result) > 0:
-            return result[0]
-        return None
+app = Flask(__name__)
+# ponytail: single-user desktop app, one module-level "current folder" is enough
+current_dir: Path | None = None
 
 
-def create_window_and_start(webview_ready_event):
-    window = webview.create_window('Interactive File Renamer',
-                                   'http://127.0.0.1:5000',
-                                   width=800,
-                                   height=600,
-                                   resizable=True, background_color='#FFFFFF',
-                                   text_select=True)  # Enable text selection
-    def expose_api(): # Expose after webview.start()
-        print("Exposing chooseDirectory API...")
-        try:
-            @window.expose
-            def chooseDirectory():
-                print("chooseDirectory called from JS!")  # Debug print
-                result = window.create_file_dialog(webview.FOLDER_DIALOG)
-                if result and len(result) > 0:
-                    print(f"Selected directory: {result[0]}")  # Debug print
-                    return result[0]
-                print("No directory selected.")  # Debug print
-                return None
-        except Exception as e:
-            print(f"Error exposing API: {e}")
+class Api:
+    """Exposed to JS as window.pywebview.api."""
 
-    webview.start(func=expose_api)  #Start and then expose
-    webview_ready_event.set()
+    def choose_directory(self) -> str | None:
+        result = webview.windows[0].create_file_dialog(webview.FileDialog.FOLDER)
+        return result[0] if result else None
 
-    webview_ready_event.set()  # Signal that the webview window is ready (and expose is done)
 
+@app.route('/')
+def index():
+    return render_template("index.html")
+
+
+@app.post('/set_directory')
+def set_directory():
+    directory = Path((request.get_json(silent=True) or {}).get('directory', '')).expanduser()
+    if not directory.is_dir():
+        return jsonify({"error": "Invalid directory."}), 400
+    global current_dir
+    current_dir = directory
+    patterns = InteractiveFileRenamer(base_dir=directory).discover_file_patterns()
+    return jsonify({"directory": str(directory), "patterns": patterns})
+
+
+@app.get('/models')
+def models():
+    return jsonify(list_ollama_models())
+
+
+@app.post('/rename_files')
+def rename_files_route():
+    if not current_dir:
+        return jsonify({'error': 'Directory not set.'}), 400
+    data = request.get_json(silent=True) or {}
+    if not data.get('prefix') and not data.get('extension'):
+        return jsonify({'error': 'Enter a prefix or an extension.'}), 400
+    # fresh renamer per run: rescanning another folder mid-run can't redirect this one
+    renamer = InteractiveFileRenamer(
+        base_dir=current_dir,
+        auto_mode=True,
+        filename_prefix=data.get('prefix', ''),
+        filename_extension=data.get('extension', ''),
+        model_name=data.get('model') or DEFAULT_MODEL,
+    )
+    try:
+        renamed, failed, failed_files = asyncio.run(renamer.rename_files())
+    except Exception as e:
+        app.logger.exception("Rename failed")
+        return jsonify({'error': str(e)}), 500
+    return jsonify({'renamed_count': renamed, 'failed_count': failed, 'failed_files': failed_files})
 
 
 if __name__ == "__main__":
-    # Start Flask server in a separate process
-    import multiprocessing
-
-    webview_ready_event = multiprocessing.Event()
-    flask_process = multiprocessing.Process(target=start_server, daemon=True)
-    webview_process = multiprocessing.Process(target=create_window_and_start, args=(webview_ready_event,), daemon=True)
-
-    flask_process.start()
-    webview_process.start()
-
-    webview_ready_event.wait()  # Wait for the window to be created
-
-    # The window is now accessible via webview.windows[0], but interaction should happen via a thread
-    # or from the function that is executed after webview.start()
-
-    try:
-        webview_process.join()  # Make main process wait for webview_process finish
-    except KeyboardInterrupt:
-        flask_process.terminate()
-        webview_process.terminate()
-        print('\nOperation interrupted by user.')
+    webview.create_window('Interactive File Renamer', app, js_api=Api(), width=800, height=600, text_select=True)
+    webview.start()
