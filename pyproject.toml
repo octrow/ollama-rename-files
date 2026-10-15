@@ -1,6 +1,6 @@
 [project]
 name = "ollama-rename-files"
-version = "0.2.0"
+version = "0.3.0"
 description = "Rename messy files by their content with a local Ollama model: CLI and desktop GUI, no API keys, originals backed up."
 readme = "README.md"
 license = "MIT"
