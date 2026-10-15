@@ -1,19 +1,43 @@
 [project]
 name = "ollama-rename-files"
 version = "0.2.0"
-description = "Rename files by their content with a local Ollama model"
+description = "Rename messy files by their content with a local Ollama model: CLI and desktop GUI, no API keys, originals backed up."
 readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "Daniil Petrov" }]
 requires-python = ">=3.10"
+keywords = ["ollama", "rename-files", "file-renamer", "local-llm", "ai", "cli", "gui", "pywebview"]
+classifiers = [
+    "Environment :: Console",
+    "Environment :: MacOS X",
+    "Environment :: Win32 (MS Windows)",
+    "Environment :: X11 Applications",
+    "Intended Audience :: End Users/Desktop",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Topic :: Utilities",
+]
 dependencies = ["ollama>=0.5.0", "flask>=3.0", "pywebview>=5.0"]
 
 [dependency-groups]
 dev = ["pytest>=8", "ruff>=0.6"]
 
-[tool.uv]
-package = false
+[project.urls]
+Homepage = "https://github.com/octrow/ollama-rename-files"
+Issues = "https://github.com/octrow/ollama-rename-files/issues"
+Changelog = "https://github.com/octrow/ollama-rename-files/blob/main/CHANGELOG.md"
 
-[tool.pytest.ini_options]
-pythonpath = ["."]
+[project.scripts]
+ollama-rename = "ollama_rename_files.__main__:main"
+
+[build-system]
+requires = ["hatchling>=1.27"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.sdist]
+exclude = ["/assets", "/.github"]
+
 
 [tool.ruff]
 line-length = 120

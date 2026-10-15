@@ -1,6 +1,11 @@
 import asyncio
 
-from rename_files import InteractiveFileRenamer, clean_model_response, sanitize_filename, unique_path
+from ollama_rename_files.rename_files import (
+    InteractiveFileRenamer,
+    clean_model_response,
+    sanitize_filename,
+    unique_path,
+)
 
 
 def test_clean_model_response_strips_think_and_fences():
@@ -28,7 +33,7 @@ def test_rename_does_not_overwrite_and_backs_up(tmp_path, monkeypatch):
     async def fake_generate(self, model, prompt, **kwargs):
         return {"response": "doc-same-name.md"}
 
-    monkeypatch.setattr("rename_files.AsyncClient.generate", fake_generate)
+    monkeypatch.setattr("ollama_rename_files.rename_files.AsyncClient.generate", fake_generate)
     renamer = InteractiveFileRenamer(base_dir=tmp_path, auto_mode=True)
 
     renamed, failed, failed_files = asyncio.run(renamer.rename_files(parallel_count=2))
@@ -41,7 +46,7 @@ def test_rename_does_not_overwrite_and_backs_up(tmp_path, monkeypatch):
 
 
 def test_parse_args_defaults_are_not_none():
-    from rename_files import parse_args
+    from ollama_rename_files.rename_files import parse_args
     args = parse_args(["-a", "-d", "."])
     assert None not in (args.model, args.context, args.prefix, args.ext)
 

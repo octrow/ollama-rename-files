@@ -1,6 +1,7 @@
 import argparse
 import asyncio
 import contextlib
+import importlib.util
 import json
 import logging
 import os
@@ -10,6 +11,7 @@ import sys
 import threading
 import time
 import urllib.request
+import webbrowser
 from collections.abc import Callable
 from pathlib import Path
 
@@ -18,7 +20,7 @@ from flask import Flask, jsonify, render_template, request
 from ollama import AsyncClient
 from werkzeug.serving import make_server
 
-from rename_files import DEFAULT_MODEL, InteractiveFileRenamer, list_ollama_models
+from ollama_rename_files.rename_files import DEFAULT_MODEL, InteractiveFileRenamer, list_ollama_models
 
 APP_ID = "ollama-rename-files"
 HOST = "127.0.0.1"
@@ -181,11 +183,16 @@ def choose_port(preferred: int, ask: Callable[[str], bool] = confirm) -> int | N
     return None
 
 
-def main() -> None:
-    parser = argparse.ArgumentParser(description="File Renamer GUI")
+def has_window_backend() -> bool:
+    """pywebview needs Qt or GTK bindings on Linux; Windows and macOS ship their own."""
+    return not sys.platform.startswith("linux") or any(importlib.util.find_spec(m) for m in ("qtpy", "gi"))
+
+
+def run(argv: list[str] | None = None) -> None:
+    parser = argparse.ArgumentParser(prog="ollama-rename gui", description="File Renamer desktop window")
     parser.add_argument("--port", type=int, default=DEFAULT_PORT, help=f"Preferred port (default {DEFAULT_PORT})")
     parser.add_argument("--browser", action="store_true", help="Only serve the UI and print its link, no window")
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
 
     port = choose_port(args.port)
     if port is None:
@@ -194,6 +201,12 @@ def main() -> None:
     url = f"http://{HOST}:{port}"
     print(f"File Renamer: {url}", flush=True)
     if args.browser:
+        server.serve_forever()
+        return
+    if not has_window_backend():
+        print("No Qt or GTK bindings for a desktop window (see README, Linux).\n"
+              f"Opening {url} in your browser instead. Press Ctrl+C to stop.", flush=True)
+        webbrowser.open(url)
         server.serve_forever()
         return
     threading.Thread(target=server.serve_forever, daemon=True).start()
@@ -205,4 +218,4 @@ def main() -> None:
 
 if __name__ == "__main__":
     with contextlib.suppress(KeyboardInterrupt):
-        main()
+        run()

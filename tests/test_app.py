@@ -2,7 +2,7 @@ import os
 
 import pytest
 
-import app as gui
+from ollama_rename_files import app as gui
 
 
 def _client(tmp_path):
@@ -30,7 +30,7 @@ def test_rename_file_renames_and_reuses_backup(tmp_path, monkeypatch):
     async def fake_generate(self, model, prompt, **kwargs):
         return {"response": "doc-hello.md"}
 
-    monkeypatch.setattr("rename_files.AsyncClient.generate", fake_generate)
+    monkeypatch.setattr("ollama_rename_files.rename_files.AsyncClient.generate", fake_generate)
     client = _client(tmp_path)
     first = client.post('/rename_file', json={'file': 'new1.txt'}).json
     assert first['ok'] and first['new_name'] == 'doc-hello.txt'

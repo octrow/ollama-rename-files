@@ -296,7 +296,10 @@ class InteractiveFileRenamer:
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Interactive File Renaming Tool")
+    parser = argparse.ArgumentParser(
+        description="Rename files by their content with a local Ollama model.",
+        epilog="Run `ollama-rename gui` for the desktop window.",
+    )
     parser.add_argument("-a", "--auto", action="store_true",
                         help="Run in auto mode without interactive prompts (requires -d)")
     parser.add_argument("-d", "--directory", help="Specify directory non-interactively")
@@ -313,8 +316,8 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     return args
 
 
-async def main() -> None:
-    args = parse_args()
+async def _main(argv: list[str] | None) -> None:
+    args = parse_args(argv)
     renamer = InteractiveFileRenamer(
         base_dir=args.directory,
         auto_mode=args.auto,
@@ -339,8 +342,12 @@ async def main() -> None:
             print(f"  - {file}: {error}")
 
 
-if __name__ == "__main__":
+def run(argv: list[str] | None = None) -> None:
     try:
-        asyncio.run(main())
+        asyncio.run(_main(argv))
     except KeyboardInterrupt:
         print("\nOperation interrupted by user.")
+
+
+if __name__ == "__main__":
+    run()
