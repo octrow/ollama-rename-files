@@ -54,3 +54,10 @@ def test_collect_matches_extension_case_insensitively(tmp_path):
     (tmp_path / "new1.TXT").write_text("x")
     renamer = InteractiveFileRenamer(base_dir=tmp_path, auto_mode=True)
     assert [p.name for p in renamer.collect_files_to_rename()] == ["new1.TXT"]
+
+
+def test_discover_groups_numbered_files_under_one_prefix(tmp_path):
+    for name in ("new1.txt", "new2.txt", "new3.TXT", "other.md"):
+        (tmp_path / name).write_text("x")
+    patterns = InteractiveFileRenamer(base_dir=tmp_path).discover_file_patterns()
+    assert patterns[0] == (("new", ".txt"), 3)

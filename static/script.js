@@ -90,8 +90,8 @@ $('rename-btn').addEventListener('click', async () => {
         });
         const lines = [`Renamed: ${result.renamed_count}, failed: ${result.failed_count}`];
         result.failed_files.forEach(([file, error]) => lines.push(`${file}: ${error}`));
-        showStatus(lines.join('\n'), result.failed_count > 0);
         await setDirectory($('directory').value);
+        showStatus(lines.join('\n'), result.failed_count > 0);
     } catch (error) {
         showStatus(`Error renaming files: ${error.message}`, true);
     } finally {

@@ -122,7 +122,7 @@ class InteractiveFileRenamer:
         patterns = Counter()
         for path in self.base_dir.iterdir():
             if path.is_file():
-                prefix_match = re.match(r"^([^.\w]{1,5}|\w{1,5})", path.name)
+                prefix_match = re.match(r"^([^\W\d_]{1,5}|\d{1,5}|[^.\w]{1,5})", path.name)
                 if prefix_match:
                     patterns[(prefix_match.group(1), path.suffix.lower())] += 1
         return patterns.most_common(TOP_PATTERNS)

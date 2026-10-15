@@ -49,6 +49,10 @@ python app.py
 ```
 Opens a desktop window (pywebview serving a Flask app): browse/scan a folder, pick a discovered pattern or type a prefix/extension, choose an installed Ollama model, click Rename.
 
+On Linux, pywebview needs a GUI backend. Either install Qt into the venv:
+`uv pip install "pywebview[qt]"` (or `pip install "pywebview[qt]"`), or use the system GTK bindings (`python3-gi`).
+Windows and macOS work out of the box.
+
 ### CLI mode (`-d`)
 ```bash
 # Rename files in specific directory
