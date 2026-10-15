@@ -109,6 +109,8 @@ class InteractiveFileRenamer:
         self.filename_extension = filename_extension
         self.max_file_name_length = max_file_name_length
         self.backup_dir: Path | None = Path(backup_dir) if backup_dir else None
+        # serialize backup+rename so parallel workers can't pick the same free name
+        self._rename_lock = asyncio.Lock()
 
     def create_backup_directory(self) -> Path:
         backup_dir = unique_path(self.base_dir / f"backup_{datetime.now():%Y%m%d_%H%M%S}")
@@ -122,7 +124,7 @@ class InteractiveFileRenamer:
         patterns = Counter()
         for path in self.base_dir.iterdir():
             if path.is_file():
-                prefix_match = re.match(r"^([^\W\d_]{1,5}|\d{1,5}|[^.\w]{1,5})", path.name)
+                prefix_match = re.match(r"^([^\W\d_]+|\d+|[^.\w]+)", path.name)
                 if prefix_match:
                     patterns[(prefix_match.group(1), path.suffix.lower())] += 1
         return patterns.most_common(TOP_PATTERNS)
@@ -276,8 +278,6 @@ class InteractiveFileRenamer:
             self.backup_dir = self.create_backup_directory()
 
         client = AsyncClient()
-        # serialize backup+rename so parallel workers can't pick the same free name
-        self._rename_lock = asyncio.Lock()
         semaphore = asyncio.Semaphore(max(parallel_count, 1))
         done = 0
 

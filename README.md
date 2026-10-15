@@ -47,7 +47,9 @@ python rename_files.py
 ```bash
 python app.py
 ```
-Opens a desktop window (pywebview serving a Flask app): browse/scan a folder, pick a discovered pattern or type a prefix/extension, choose an installed Ollama model, click Rename.
+Opens a desktop window (pywebview serving a Flask app). Browse to a folder, pick a discovered pattern or type a prefix/extension, and the window lists exactly which files will change. Choose an installed Ollama model and click **Rename N files**: each row fills in with its new name as the model answers, and **Stop** halts the run after the current file.
+
+The UI is served at `http://127.0.0.1:5000` (change with `--port` or `FILE_RENAMER_PORT`). If that port is taken by another app, the next free port is used. If File Renamer itself is already running there, you get its link and a `Restart it? [y/N]` prompt (No by default, and always No without a terminal). `python app.py --browser` serves the UI without opening a window.
 
 On Linux, pywebview needs a GUI backend. Either install Qt into the venv:
 `uv pip install "pywebview[qt]"` (or `pip install "pywebview[qt]"`), or use the system GTK bindings (`python3-gi`).

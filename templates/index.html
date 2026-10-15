@@ -4,38 +4,47 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>File Renamer</title>
+    <link rel="icon" href="data:,">
     <link rel="stylesheet" href="/static/styles.css">
 </head>
 <body>
-<main id="app">
-    <h1>File Renamer</h1>
+<header class="top">
+    <h1>Rename files by what's inside them</h1>
+    <form id="folder-form" class="folder">
+        <label for="directory" class="visually-hidden">Folder</label>
+        <input type="text" id="directory" placeholder="Folder path, e.g. ~/notes/inbox" autocomplete="off" spellcheck="false">
+        <button type="button" id="browse-btn" class="quiet">Browse…</button>
+        <button type="submit" id="scan-btn" class="quiet">Scan</button>
+    </form>
+</header>
 
-    <section>
-        <label for="directory">Directory</label>
-        <div class="row">
-            <input type="text" id="directory" placeholder="/path/to/folder">
-            <button id="choose-dir-btn" type="button" class="secondary">Browse…</button>
-            <button id="set-dir-btn" type="button">Scan</button>
+<main>
+    <section id="controls" class="controls" hidden>
+        <fieldset class="patterns">
+            <legend>Files that look like</legend>
+            <div id="patterns" class="chips"></div>
+        </fieldset>
+        <div class="fields">
+            <label>Name starts with
+                <input type="text" id="prefix" class="mono" spellcheck="false">
+            </label>
+            <label>Extension
+                <input type="text" id="extension" class="mono" spellcheck="false" placeholder="any">
+            </label>
         </div>
     </section>
 
-    <section id="patterns-section" hidden>
-        <h2>Pattern</h2>
-        <div id="patterns"></div>
-        <div class="row">
-            <input type="text" id="prefix" placeholder="prefix" aria-label="File prefix">
-            <input type="text" id="extension" placeholder=".txt" aria-label="File extension">
-        </div>
-    </section>
-
-    <section>
-        <label for="model">Model</label>
-        <select id="model"></select>
-    </section>
-
-    <button id="rename-btn" type="button">Rename files</button>
-    <div id="status" role="status" aria-live="polite"></div>
+    <ul id="files" class="files" aria-label="Files to rename"></ul>
+    <p id="empty" class="empty">Choose a folder to see which files will be renamed. Each original is copied to a backup folder before it changes.</p>
 </main>
+
+<footer class="actions">
+    <p id="status" class="status" role="status" aria-live="polite"></p>
+    <label class="model">Model
+        <select id="model"></select>
+    </label>
+    <button type="button" id="rename-btn" class="primary" disabled>Rename files</button>
+</footer>
 <script src="/static/script.js"></script>
 </body>
 </html>

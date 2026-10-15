@@ -61,3 +61,9 @@ def test_discover_groups_numbered_files_under_one_prefix(tmp_path):
         (tmp_path / name).write_text("x")
     patterns = InteractiveFileRenamer(base_dir=tmp_path).discover_file_patterns()
     assert patterns[0] == (("new", ".txt"), 3)
+
+
+def test_discover_keeps_whole_leading_word(tmp_path):
+    for name in ("Untitled.md", "Untitled 1.md"):
+        (tmp_path / name).write_text("x")
+    assert InteractiveFileRenamer(base_dir=tmp_path).discover_file_patterns() == [(("Untitled", ".md"), 2)]
