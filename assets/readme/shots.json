@@ -1,0 +1,9 @@
+{
+  "base": "http://127.0.0.1:5000",
+  "chrome": "/usr/bin/google-chrome",
+  "shots": [
+    {"name": "gui-renamed", "path": "/", "width": 880, "height": 680, "scale": 2,
+     "steps": [["fill", "Folder", "DEMO_DIR"], ["click_button", "Scan"], ["wait", 1500],
+               ["click_button", "Rename"], ["wait", 60000]]}
+  ]
+}

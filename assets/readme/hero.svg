@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="400" viewBox="0 0 1200 400" role="img" aria-labelledby="title desc">
+  <title id="title">Ollama File Renamer</title>
+  <desc id="desc">Rename files by what's inside them, with a local Ollama model. Three files from a real run: new2.txt became docs-update-backend-migration-plan.txt, new4.txt became review-payment-hook-signature-check-first.txt, new6.txt became sql-create-index-orders-slow-reports.txt.</desc>
+  <style>
+    .ui { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Ubuntu, Cantarell, sans-serif; }
+    .mono, .old, .new, .arrow { font-family: "JetBrains Mono", "Cascadia Code", "SF Mono", Menlo, Consolas, monospace; }
+    .old { font-size: 22px; fill: #5d6676; }
+    .new { font-size: 22px; fill: #1b2230; }
+    .arrow { font-size: 22px; fill: #5d6676; }
+  </style>
+  <rect width="1200" height="400" rx="24" fill="#f5f6f3"/>
+  <rect x="0.5" y="0.5" width="1199" height="399" rx="24" fill="none" stroke="#dcdfd8"/>
+  <g transform="translate(64 -24)">
+    <text x="0" y="132" class="ui" font-size="54" font-weight="700" fill="#1b2230">Ollama File Renamer</text>
+    <text x="0" y="174" class="ui" font-size="26" fill="#5d6676">Rename files by what's inside them. No API keys, originals backed up.</text>
+    <text x="0" y="236" class="old" textLength="105.6" lengthAdjust="spacingAndGlyphs">new2.txt</text>
+    <text x="150" y="236" class="arrow">→</text>
+    <rect x="186" y="215" width="517.6" height="30" fill="#f2df6b"/>
+    <text x="194" y="236" class="new" textLength="501.6" lengthAdjust="spacingAndGlyphs">docs-update-backend-migration-plan.txt</text>
+    <text x="0" y="282" class="old" textLength="105.6" lengthAdjust="spacingAndGlyphs">new4.txt</text>
+    <text x="150" y="282" class="arrow">→</text>
+    <rect x="186" y="261" width="610.0" height="30" fill="#f2df6b"/>
+    <text x="194" y="282" class="new" textLength="594.0" lengthAdjust="spacingAndGlyphs">review-payment-hook-signature-check-first.txt</text>
+    <text x="0" y="328" class="old" textLength="105.6" lengthAdjust="spacingAndGlyphs">new6.txt</text>
+    <text x="150" y="328" class="arrow">→</text>
+    <rect x="186" y="307" width="544.0" height="30" fill="#f2df6b"/>
+    <text x="194" y="328" class="new" textLength="528.0" lengthAdjust="spacingAndGlyphs">sql-create-index-orders-slow-reports.txt</text>
+  </g>
+  <text x="1136" y="366" class="mono" font-size="16" fill="#5d6676" text-anchor="end">real run · qwen2.5-coder:1.5b</text>
+</svg>
