@@ -33,21 +33,23 @@ function renderPatterns(patterns) {
         container.textContent = 'This folder has no files.';
         return;
     }
-    patterns.forEach(([[prefix, ext], count], i) => {
-        const label = document.createElement('label');
-        label.className = 'chip';
-        const radio = document.createElement('input');
-        radio.type = 'radio';
-        radio.name = 'pattern';
-        radio.checked = i === 0;
-        radio.addEventListener('change', () => usePattern(prefix, ext));
-        const text = document.createElement('span');
-        const hint = document.createElement('small');
-        hint.textContent = plural(count, 'file');
-        text.append(`${prefix}*${ext}`, hint);
-        label.append(radio, text);
-        container.appendChild(label);
-    });
+    patterns.forEach(([[prefix, ext], count], i) => container.appendChild(buildChip(prefix, ext, count, i === 0)));
+}
+
+function buildChip(prefix, ext, count, checked) {
+    const label = document.createElement('label');
+    label.className = 'chip';
+    const radio = document.createElement('input');
+    radio.type = 'radio';
+    radio.name = 'pattern';
+    radio.checked = checked;
+    radio.addEventListener('change', () => usePattern(prefix, ext));
+    const text = document.createElement('span');
+    const hint = document.createElement('small');
+    hint.textContent = plural(count, 'file');
+    text.append(`${prefix}*${ext}`, hint);
+    label.append(radio, text);
+    return label;
 }
 
 function usePattern(prefix, extension) {
@@ -82,23 +84,25 @@ async function refreshPatterns() {
 
 /* ---------- file list ---------- */
 
+function buildRow(name) {
+    const row = document.createElement('li');
+    row.className = 'row';
+    row.dataset.state = 'pending';
+    const old = document.createElement('span');
+    old.className = 'old';
+    old.textContent = name;
+    const arrow = document.createElement('span');
+    arrow.className = 'arrow';
+    arrow.setAttribute('aria-hidden', 'true');
+    arrow.textContent = '→';
+    const fresh = document.createElement('span');
+    fresh.className = 'new';
+    row.append(old, arrow, fresh);
+    return {name, row, fresh};
+}
+
 function renderFiles(names) {
-    state.files = names.map((name) => {
-        const row = document.createElement('li');
-        row.className = 'row';
-        row.dataset.state = 'pending';
-        const old = document.createElement('span');
-        old.className = 'old';
-        old.textContent = name;
-        const arrow = document.createElement('span');
-        arrow.className = 'arrow';
-        arrow.setAttribute('aria-hidden', 'true');
-        arrow.textContent = '→';
-        const fresh = document.createElement('span');
-        fresh.className = 'new';
-        row.append(old, arrow, fresh);
-        return {name, row, fresh};
-    });
+    state.files = names.map(buildRow);
     $('files').replaceChildren(...state.files.map((f) => f.row));
 
     const hasFiles = names.length > 0;
@@ -109,9 +113,9 @@ function renderFiles(names) {
     updateRenameButton();
 }
 
-function setRow(file, rowState, text = '', asMark = false) {
+function setRow(file, rowState, text = '') {
     file.row.dataset.state = rowState;
-    if (asMark) {
+    if (rowState === 'done') {
         const mark = document.createElement('mark');
         mark.textContent = text;
         file.fresh.replaceChildren(mark);
@@ -173,12 +177,32 @@ function setInputsLocked(locked) {
     document.querySelectorAll('input[name="pattern"]').forEach((r) => { r.disabled = locked; });
 }
 
+/** Rename one row; returns the backup folder the server used (null if the request failed). */
+async function renameOne(file, model, backupDir) {
+    setRow(file, 'working');
+    try {
+        const result = await postJson('/rename_file', {file: file.name, model, backup_dir: backupDir});
+        setRow(file, result.ok ? 'done' : 'failed', result.ok ? result.new_name : result.error);
+        return result.backup_dir;
+    } catch (error) {
+        setRow(file, 'failed', error.message);
+        return backupDir;
+    }
+}
+
+function runSummary(queue, backupDir) {
+    const count = (s) => queue.filter((f) => f.row.dataset.state === s).length;
+    const parts = [`Renamed ${plural(count('done'), 'file')}`];
+    if (count('failed')) parts.push(`${count('failed')} failed`);
+    if (state.stopRequested) parts.push('stopped early');
+    const backupNote = backupDir ? ` Originals are in ${backupDir}.` : '';
+    showStatus(`${parts.join(', ')}.${backupNote}`, count('failed') > 0);
+}
+
 async function renameAll() {
     const queue = state.files.filter((f) => f.row.dataset.state === 'pending');
     const model = $('model').value;
     let backupDir = null;
-    let renamed = 0;
-    let failed = 0;
 
     state.running = true;
     state.stopRequested = false;
@@ -188,32 +212,14 @@ async function renameAll() {
     for (const [i, file] of queue.entries()) {
         if (state.stopRequested) break;
         showStatus(`Renaming ${i + 1} of ${queue.length} with ${model}…`);
-        setRow(file, 'working');
-        try {
-            const result = await postJson('/rename_file', {file: file.name, model, backup_dir: backupDir});
-            backupDir = result.backup_dir;
-            if (result.ok) {
-                setRow(file, 'done', result.new_name, true);
-                renamed += 1;
-            } else {
-                setRow(file, 'failed', result.error);
-                failed += 1;
-            }
-        } catch (error) {
-            setRow(file, 'failed', error.message);
-            failed += 1;
-        }
+        backupDir = await renameOne(file, model, backupDir);
     }
 
     state.running = false;
     setInputsLocked(false);
     await refreshPatterns();
     updateRenameButton();
-    const parts = [`Renamed ${plural(renamed, 'file')}`];
-    if (failed) parts.push(`${failed} failed`);
-    if (state.stopRequested) parts.push('stopped early');
-    const backupNote = backupDir ? ` Originals are in ${backupDir}.` : '';
-    showStatus(`${parts.join(', ')}.${backupNote}`, failed > 0);
+    runSummary(queue, backupDir);
 }
 
 /* ---------- wiring ---------- */

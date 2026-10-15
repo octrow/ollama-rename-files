@@ -41,13 +41,18 @@ class Api:
         return result[0] if result else None
 
 
-def _child(name: str | None, must_be: str) -> Path | None:
-    """Resolve a bare name inside current_dir; None if it's a path, missing, or the wrong kind."""
+def _child(name: str | None) -> Path | None:
+    """Path of an existing entry in current_dir; None for missing names or anything that isn't a bare name."""
     if not current_dir or not name or Path(name).name != name:
         return None
     path = current_dir / name
-    exists = path.is_file() if must_be == "file" else path.is_dir()
-    return path if exists else None
+    return path if path.exists() else None
+
+
+def _backup_dir(name: str | None) -> Path | None:
+    """The run's backup folder, if the name points at one inside current_dir."""
+    path = _child(name)
+    return path if path and path.is_dir() and path.name.startswith("backup_") else None
 
 
 @app.route('/')
@@ -93,12 +98,11 @@ def preview():
 def rename_file():
     """Rename one file. The first call of a run creates the backup folder; later calls pass its name back."""
     data = request.get_json(silent=True) or {}
-    path = _child(data.get('file'), "file")
-    if not path:
+    path = _child(data.get('file'))
+    if not path or not path.is_file():
         return jsonify({'error': 'File not found in the chosen folder.'}), 400
-    backup_name = data.get('backup_dir')
-    backup_dir = _child(backup_name, "dir") if backup_name else None
-    if backup_name and (not backup_dir or not backup_name.startswith("backup_")):
+    backup_dir = _backup_dir(data.get('backup_dir'))
+    if data.get('backup_dir') and not backup_dir:
         return jsonify({'error': 'Backup folder is missing. Start the run again.'}), 400
 
     renamer = InteractiveFileRenamer(
