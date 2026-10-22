@@ -18,7 +18,12 @@ classifiers = [
     "Programming Language :: Python :: 3",
     "Topic :: Utilities",
 ]
-dependencies = ["ollama>=0.5.0", "flask>=3.0", "pywebview>=5.0"]
+dependencies = [
+    "ollama>=0.5.0",
+    "flask>=3.0",
+    "pywebview>=5.0",
+    "pypdf>=6",
+]
 
 [dependency-groups]
 dev = ["pytest>=8", "ruff>=0.6"]

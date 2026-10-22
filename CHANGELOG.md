@@ -3,6 +3,14 @@
 All notable changes to this project. Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 versions follow [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Fixed
+
+- PDF files are renamed by their text instead of failing with `'utf-8' codec can't decode byte 0xe2`
+  ([#2](https://github.com/octrow/ollama-rename-files/issues/2)). Binary files, encrypted or broken PDFs and PDFs
+  without a text layer fail with a clear reason instead of stopping the whole run.
+
 ## [0.3.0] - 2026-10-16
 
 First tagged release.

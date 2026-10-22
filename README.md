@@ -28,6 +28,8 @@ writers, people who dump quick notes into one inbox folder.
 - It groups the folder into patterns (`new*.txt`, `Untitled*.md`); you choose one or type a prefix and extension.
 - Works with any model you have installed in Ollama. Reasoning models work too: their `<think>` output is stripped.
 - The CLI can rename several files at once (`-p 4`).
+- Reads text files and the text layer of PDFs (`--ext .pdf`). Scanned PDFs without text and other
+  binary files are skipped with a reason.
 
 ## Install
 
@@ -124,7 +126,7 @@ Ollama on another machine or port? Set `OLLAMA_HOST`, e.g. `OLLAMA_HOST=http://1
 
 1. Finds the files in the folder that match the pattern (prefix and extension).
 2. Creates `backup_<timestamp>/` in that folder and copies each file there before renaming it.
-3. Sends the first `--context` characters of the file to your local Ollama model.
+3. Sends the first `--context` characters of the file (for a PDF, of its extracted text) to your local Ollama model.
 4. Cleans the suggested name: lowercase, safe characters, at most 128 characters.
 5. Renames the file, keeping its original extension and never overwriting an existing file.
 6. Logs every action and prints which files failed and why.
@@ -143,7 +145,7 @@ The prompt is tuned for software-project notes: type is task, issue, doc, snippe
 also renames images and videos, and it talks to Ollama, LM Studio and OpenAI. Pick it if you rename photos or want a
 cloud model.
 
-Ollama File Renamer is narrower: text files and local Ollama only. What it adds is a desktop window with a preview of
+Ollama File Renamer is narrower: text files, PDFs and local Ollama only. What it adds is a desktop window with a preview of
 the exact files that will change, a backup copy of every original, renames that never overwrite, and pattern
 discovery so you rename `new*.txt` without touching the rest of the folder.
 

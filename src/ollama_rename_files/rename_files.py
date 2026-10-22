@@ -1,5 +1,6 @@
 import argparse
 import asyncio
+import codecs
 import logging
 import re
 import shutil
@@ -11,6 +12,7 @@ from datetime import datetime
 from pathlib import Path
 
 from ollama import AsyncClient, Client
+from pypdf import PdfReader
 
 logging.basicConfig(
     level=logging.INFO,
@@ -81,6 +83,25 @@ def unique_path(path: Path) -> Path:
         candidate = path.with_name(f"{path.stem}-{n}{path.suffix}")
         n += 1
     return candidate
+
+
+def read_content(path: Path, limit: int) -> str:
+    """First `limit` characters of a file's text: PDF text layer, or the file decoded as UTF-8."""
+    if path.suffix.lower() == ".pdf":
+        text = ""
+        for page in PdfReader(path).pages:
+            text += page.extract_text() + "\n"
+            if len(text) >= limit:
+                break
+        if not text.strip():
+            raise ValueError("PDF has no text layer (scanned image?)")
+        return text.strip()[:limit]
+    with path.open("rb") as f:
+        data = f.read(limit * 4)  # 4 bytes is the longest UTF-8 character
+    if b"\0" in data:
+        raise ValueError("binary or UTF-16 file, only UTF-8 text and PDF files are supported")
+    # incremental decoder: a character cut in half by the read above is dropped, not an error
+    return codecs.getincrementaldecoder("utf-8")().decode(data)[:limit]
 
 
 def list_ollama_models() -> list[str]:
@@ -232,8 +253,8 @@ class InteractiveFileRenamer:
         """Returns (success, message)."""
         filename = file_path.name
         try:
-            content = file_path.read_text(encoding='utf-8')[:self.context_length]
-        except (OSError, UnicodeDecodeError) as e:
+            content = await asyncio.to_thread(read_content, file_path, self.context_length)
+        except Exception as e:  # noqa: BLE001 - pypdf raises arbitrary errors on corrupt or encrypted PDFs
             logger.error(f"Error reading file {filename}: {e}")
             return False, str(e)
 

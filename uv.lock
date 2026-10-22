@@ -394,6 +394,7 @@ source = { editable = "." }
 dependencies = [
     { name = "flask" },
     { name = "ollama" },
+    { name = "pypdf" },
     { name = "pywebview" },
 ]
 
@@ -407,6 +408,7 @@ dev = [
 requires-dist = [
     { name = "flask", specifier = ">=3.0" },
     { name = "ollama", specifier = ">=0.5.0" },
+    { name = "pypdf", specifier = ">=6" },
     { name = "pywebview", specifier = ">=5.0" },
 ]
 
@@ -731,6 +733,18 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/f8/fb/3d48fb3deb0a57d25c118684dd13f702f856cadfcbd553b9a1ff5c8ba5fc/pyobjc_framework_webkit-12.2.2-cp314-cp314t-macosx_10_15_universal2.whl", hash = "sha256:147f0f18c0ddd70a1d05f88cf42a89b423b191957db6faf508cbbdb33092864c", size = 50971, upload-time = "2026-08-11T19:43:34.963Z" },
     { url = "https://files.pythonhosted.org/packages/56/79/5dfb4cb4cc3bf1f534a154fd6d9737a53288224e5eeca14cb0a4b18e5665/pyobjc_framework_webkit-12.2.2-cp315-cp315-macosx_10_15_universal2.whl", hash = "sha256:0be3ed885100dd38c6b927c9a25a63f22fd624bc4c6bb3d3af14fab5dcdcfc97", size = 50501, upload-time = "2026-08-11T19:43:35.835Z" },
     { url = "https://files.pythonhosted.org/packages/03/5b/e1e2f3f2a2d9194467898494cf102eaa96db1a395278a961861254ba0c48/pyobjc_framework_webkit-12.2.2-cp315-cp315t-macosx_10_15_universal2.whl", hash = "sha256:88c896d89764675af1ef85c6bda8740e50451e31bcd1d1d2ef59323acc9916ed", size = 50963, upload-time = "2026-08-11T19:43:37.152Z" },
+]
+
+[[package]]
+name = "pypdf"
+version = "6.21.2"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "typing-extensions", marker = "python_full_version < '3.11'" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/06/28/081f1cbcca7042441dafc8de00f48ba60853f89e5bff92c5f26477346d81/pypdf-6.21.2.tar.gz", hash = "sha256:0a3e1c5c886a1be03646c16a04827cc166c2a0575c971b26a4bf89686551c2d4", size = 7144571, upload-time = "2026-10-21T16:44:55.272Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/1b/4d/c9d2d67f204eff463237a1a8f5e25a6923b7b1043982b91fcaf104c8ef60/pypdf-6.21.2-py3-none-any.whl", hash = "sha256:1d44d1a3a200f25062adff0085b02040e4646431ac2ccac22e42679e91466084", size = 407766, upload-time = "2026-10-21T16:44:53.626Z" },
 ]
 
 [[package]]

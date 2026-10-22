@@ -82,3 +82,81 @@ def test_clean_model_response_ignores_fence_language_tag():
 def test_sanitize_filename_drops_commas():
     name = sanitize_filename("idea - respect color-scheme, keep palette", ".txt")
     assert name == "idea-respect-color-scheme-keep-palette.txt"
+
+
+def _tiny_pdf(text: str) -> bytes:
+    """One-page PDF with `text` in Helvetica, valid xref offsets."""
+    stream = f"BT /F1 12 Tf 72 720 Td ({text}) Tj ET".encode()
+    objects = [
+        b"<< /Type /Catalog /Pages 2 0 R >>",
+        b"<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+        b"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R"
+        b" /Resources << /Font << /F1 5 0 R >> >> >>",
+        b"<< /Length %d >>\nstream\n" % len(stream) + stream + b"\nendstream",
+        b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",
+    ]
+    out, offsets = bytearray(b"%PDF-1.4\n"), []
+    for i, body in enumerate(objects, 1):
+        offsets.append(len(out))
+        out += b"%d 0 obj\n" % i + body + b"\nendobj\n"
+    xref = len(out)
+    out += b"xref\n0 %d\n0000000000 65535 f \n" % (len(objects) + 1)
+    out += b"".join(b"%010d 00000 n \n" % o for o in offsets)
+    out += b"trailer\n<< /Size %d /Root 1 0 R >>\nstartxref\n%d\n%%%%EOF\n" % (len(objects) + 1, xref)
+    return bytes(out)
+
+
+def test_read_content_extracts_pdf_text(tmp_path):
+    from ollama_rename_files.rename_files import read_content
+    pdf = tmp_path / "new1.pdf"
+    pdf.write_bytes(_tiny_pdf("Quarterly budget report"))
+    assert "Quarterly budget report" in read_content(pdf, 2048)
+    assert read_content(pdf, 9) == "Quarterly"
+
+
+def test_read_content_pdf_without_text_layer_fails(tmp_path):
+    import pytest
+
+    from ollama_rename_files.rename_files import read_content
+    pdf = tmp_path / "new1.pdf"
+    pdf.write_bytes(_tiny_pdf(""))
+    with pytest.raises(ValueError, match="no text layer"):
+        read_content(pdf, 2048)
+
+
+def test_read_content_drops_character_cut_by_byte_limit(tmp_path):
+    from ollama_rename_files.rename_files import read_content
+    path = tmp_path / "new1.txt"
+    path.write_text("€" * 10, encoding="utf-8")  # 3-byte chars: the 8-byte read ends mid-character
+    assert read_content(path, 2) == "€€"
+
+
+def test_read_content_rejects_binary(tmp_path):
+    import pytest
+
+    from ollama_rename_files.rename_files import read_content
+    path = tmp_path / "new1.bin"
+    path.write_bytes(b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR")
+    with pytest.raises(ValueError, match="binary"):
+        read_content(path, 2048)
+
+
+def test_broken_pdf_fails_only_that_file(tmp_path, monkeypatch):
+    (tmp_path / "new1.pdf").write_bytes(b"%PDF-1.4 not really a pdf")
+    (tmp_path / "new2.pdf").write_bytes(_tiny_pdf("Meeting notes"))
+    prompts = []
+
+    async def fake_generate(self, model, prompt, **kwargs):
+        prompts.append(prompt)
+        return {"response": "doc-meeting-notes.md"}
+
+    monkeypatch.setattr("ollama_rename_files.rename_files.AsyncClient.generate", fake_generate)
+    renamer = InteractiveFileRenamer(base_dir=tmp_path, auto_mode=True, filename_extension=".pdf")
+
+    renamed, failed, failed_files = asyncio.run(renamer.rename_files())
+
+    assert (renamed, failed) == (1, 1)
+    assert failed_files[0][0] == "new1.pdf"
+    assert (tmp_path / "new1.pdf").exists()
+    assert (tmp_path / "doc-meeting-notes.pdf").exists()
+    assert "Meeting notes" in prompts[0]
