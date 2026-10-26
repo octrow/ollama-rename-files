@@ -273,7 +273,7 @@ class InteractiveFileRenamer:
     def _backup_and_rename(self, file_path: Path, new_filename: str) -> tuple[bool, str]:
         """Copy to backup_dir, then rename to a free name. Never overwrites."""
         try:
-            shutil.copy2(file_path, self.backup_dir)
+            shutil.copy2(file_path, unique_path(self.backup_dir / file_path.name))
             new_file_path = unique_path(self.base_dir / new_filename)
             file_path.rename(new_file_path)
         except OSError as e:
