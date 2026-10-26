@@ -160,3 +160,17 @@ def test_broken_pdf_fails_only_that_file(tmp_path, monkeypatch):
     assert (tmp_path / "new1.pdf").exists()
     assert (tmp_path / "doc-meeting-notes.pdf").exists()
     assert "Meeting notes" in prompts[0]
+
+
+def test_backup_does_not_overwrite_existing_backup(tmp_path):
+    backup = tmp_path / "backup"
+    backup.mkdir()
+    (backup / "new1.txt").write_text("old backup")
+    (tmp_path / "new1.txt").write_text("current")
+    renamer = InteractiveFileRenamer(base_dir=tmp_path, auto_mode=True, backup_dir=backup)
+
+    ok, _ = renamer._backup_and_rename(tmp_path / "new1.txt", "doc-a.txt")
+
+    assert ok
+    assert (backup / "new1.txt").read_text() == "old backup"
+    assert (backup / "new1-1.txt").read_text() == "current"
