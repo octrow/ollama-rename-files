@@ -174,3 +174,18 @@ def test_backup_does_not_overwrite_existing_backup(tmp_path):
     assert ok
     assert (backup / "new1.txt").read_text() == "old backup"
     assert (backup / "new1-1.txt").read_text() == "current"
+
+
+def test_rename_to_same_name_is_noop(tmp_path):
+    backup = tmp_path / "backup"
+    backup.mkdir()
+    (tmp_path / "new-foo.txt").write_text("current")
+    renamer = InteractiveFileRenamer(base_dir=tmp_path, auto_mode=True, backup_dir=backup)
+
+    ok, name = renamer._backup_and_rename(tmp_path / "new-foo.txt", "new-foo.txt")
+
+    assert ok
+    assert name == "new-foo.txt"
+    assert (tmp_path / "new-foo.txt").read_text() == "current"
+    assert not (tmp_path / "new-foo-1.txt").exists()
+    assert list(backup.iterdir()) == []
