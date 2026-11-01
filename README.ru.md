@@ -57,6 +57,16 @@ powershell -ExecutionPolicy ByPass -c "irm https://raw.githubusercontent.com/oct
 Хотите сначала прочитать скрипт? Скачайте [`install.sh`](install.sh) или [`install.ps1`](install.ps1), просмотрите и запустите.
 Повторный запуск обновляет приложение, а `sh install.sh --uninstall` (или `$env:INSTALL_UNINSTALL = "1"` в Windows) удаляет его.
 
+### Из PyPI
+
+Уже есть Python 3.10+? Установите из [PyPI](https://pypi.org/project/ollama-rename-files/):
+
+```bash
+uv tool install ollama-rename-files   # или: pipx install ollama-rename-files
+```
+
+Обновление: `uv tool upgrade ollama-rename-files` (`pipx upgrade ollama-rename-files`).
+
 ### Готовая сборка
 
 Python не нужен: скачайте архив для своей системы из

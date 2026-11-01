@@ -57,6 +57,16 @@ powershell -ExecutionPolicy ByPass -c "irm https://raw.githubusercontent.com/oct
 Prefer to read it first? Download [`install.sh`](install.sh) or [`install.ps1`](install.ps1), look through it, then run it.
 Run it again to update; `sh install.sh --uninstall` (or `$env:INSTALL_UNINSTALL = "1"` on Windows) removes the app.
 
+### From PyPI
+
+Already have Python 3.10+? Install it from [PyPI](https://pypi.org/project/ollama-rename-files/):
+
+```bash
+uv tool install ollama-rename-files   # or: pipx install ollama-rename-files
+```
+
+Update with `uv tool upgrade ollama-rename-files` (`pipx upgrade ollama-rename-files`).
+
 ### Standalone build
 
 No Python needed: download the archive for your system from the
