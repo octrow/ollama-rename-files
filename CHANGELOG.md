@@ -5,6 +5,16 @@ versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Security
+
+- The desktop window's local server answers only requests addressed to `127.0.0.1` or `localhost`. Before, a web page
+  using DNS rebinding could point it at any folder, list its files and rename them.
+
+### Fixed
+
+- When Ollama isn't running or the model isn't pulled, each failed file says what to run (`ollama serve`,
+  `ollama pull <model>`) instead of a bare connection or 404 error.
+
 ## [0.3.3] - 2026-11-01
 
 ### Changed

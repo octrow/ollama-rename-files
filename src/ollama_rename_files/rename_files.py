@@ -11,7 +11,7 @@ from collections import Counter
 from datetime import datetime
 from pathlib import Path
 
-from ollama import AsyncClient, Client
+from ollama import AsyncClient, Client, ResponseError
 from pypdf import PdfReader
 
 logging.basicConfig(
@@ -102,6 +102,15 @@ def read_content(path: Path, limit: int) -> str:
         raise ValueError("binary or UTF-16 file, only UTF-8 text and PDF files are supported")
     # incremental decoder: a character cut in half by the read above is dropped, not an error
     return codecs.getincrementaldecoder("utf-8")().decode(data)[:limit]
+
+
+def explain_ollama_error(error: Exception, model_name: str) -> str:
+    """Ollama's error plus the command that fixes it, for the two errors a first run hits."""
+    if isinstance(error, ConnectionError):
+        return "Ollama isn't reachable. Start it with `ollama serve` (or the Ollama app), or set OLLAMA_HOST."
+    if isinstance(error, ResponseError) and error.status_code == 404:
+        return f"Model {model_name} isn't installed. Run `ollama pull {model_name}`."
+    return str(error)
 
 
 def list_ollama_models() -> list[str]:
@@ -267,7 +276,7 @@ class InteractiveFileRenamer:
                 raise ValueError("model returned no file name")
         except Exception as e:  # noqa: BLE001 - any model/transport error fails just this file
             logger.error(f"Error generating new filename for {filename}: {e}")
-            return False, str(e)
+            return False, explain_ollama_error(e, self.model_name)
 
         new_filename = sanitize_filename(suggested_name, file_path.suffix, self.max_file_name_length)
         async with self._rename_lock:

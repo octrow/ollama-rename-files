@@ -195,3 +195,23 @@ def test_rename_to_same_name_is_noop(tmp_path):
     assert (tmp_path / "new-foo.txt").read_text() == "current"
     assert not (tmp_path / "new-foo-1.txt").exists()
     assert list(backup.iterdir()) == []
+
+
+def test_ollama_errors_say_what_to_do(tmp_path, monkeypatch):
+    from ollama import ResponseError
+
+    (tmp_path / "new1.txt").write_text("a")
+    (tmp_path / "new2.txt").write_text("b")
+    errors = iter([ConnectionError("Failed to connect"), ResponseError("model 'tiny:1b' not found", 404)])
+
+    async def fake_generate(self, model, prompt, **_kwargs):
+        raise next(errors)
+
+    monkeypatch.setattr("ollama_rename_files.rename_files.AsyncClient.generate", fake_generate)
+    renamer = InteractiveFileRenamer(base_dir=tmp_path, auto_mode=True, model_name="tiny:1b")
+
+    _, _, failed_files = asyncio.run(renamer.rename_files())
+
+    messages = dict(failed_files)
+    assert "ollama serve" in messages["new1.txt"]
+    assert "ollama pull tiny:1b" in messages["new2.txt"]
