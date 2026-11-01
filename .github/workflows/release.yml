@@ -1,7 +1,6 @@
 # Tag vX.Y.Z → tests → wheel, sdist and PyInstaller builds → GitHub release with every file attested.
 # A push to main that changes this file builds everything as a dry run and publishes nothing.
-# PyPI is off until a trusted publisher is set up (PyPI → Publishing → pending publisher: owner octrow,
-# repo ollama-rename-files, workflow release.yml, environment pypi); then uncomment the pypi job.
+# PyPI: trusted publisher (owner octrow, repo ollama-rename-files, workflow release.yml, environment pypi).
 name: release
 on:
   push:
@@ -84,21 +83,20 @@ jobs:
           name: bin-${{ matrix.platform }}
           path: ollama-rename-*.*
 
-  # Optional: uncomment once the PyPI trusted publisher exists.
-  # pypi:
-  #   needs: [build, binaries]  # publish nothing unless every build passed
-  #   if: startsWith(github.ref, 'refs/tags/')
-  #   runs-on: ubuntu-latest
-  #   timeout-minutes: 15
-  #   environment: pypi
-  #   permissions:
-  #     id-token: write      # trusted publishing (OIDC) and PEP 740 attestations
-  #   steps:
-  #     - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
-  #       with:
-  #         name: dist
-  #         path: dist/
-  #     - uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33 # v1.14.2
+  pypi:
+    needs: [build, binaries]  # publish nothing unless every build passed
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: pypi
+    permissions:
+      id-token: write      # trusted publishing (OIDC) and PEP 740 attestations
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: dist
+          path: dist/
+      - uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33 # v1.14.2
 
   github-release:
     needs: [build, binaries]
