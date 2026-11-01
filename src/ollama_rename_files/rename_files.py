@@ -16,7 +16,7 @@ from pypdf import PdfReader
 
 logging.basicConfig(
     level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s',
+    format="%(asctime)s - %(levelname)s - %(message)s",
     handlers=[logging.StreamHandler(sys.stdout)],
 )
 logger = logging.getLogger(__name__)
@@ -69,7 +69,7 @@ def sanitize_filename(suggested_name: str, original_ext: str, max_len: int = MAX
     name = re.sub(r"\s+", "-", name)
     name = re.sub(r"-{2,}", "-", name)
     name = re.sub(r"^[^a-zA-Z]+", "", name)
-    name = name[:max_len - len(original_ext)]
+    name = name[: max_len - len(original_ext)]
     name = re.sub(r"[^a-zA-Z0-9]+$", "", name)
     if not name:
         name = f"untitled-document-{uuid.uuid4().hex[:8]}"
@@ -114,15 +114,15 @@ def list_ollama_models() -> list[str]:
 
 class InteractiveFileRenamer:
     def __init__(
-            self,
-            base_dir: str | Path | None = None,
-            auto_mode: bool = False,
-            model_name: str = DEFAULT_MODEL,
-            context_length: int = DEFAULT_CONTEXT_LENGTH,
-            filename_prefix: str = DEFAULT_PREFIX,
-            filename_extension: str = DEFAULT_EXTENSION,
-            max_file_name_length: int = MAX_FILE_NAME_LENGTH,
-            backup_dir: str | Path | None = None,
+        self,
+        base_dir: str | Path | None = None,
+        auto_mode: bool = False,
+        model_name: str = DEFAULT_MODEL,
+        context_length: int = DEFAULT_CONTEXT_LENGTH,
+        filename_prefix: str = DEFAULT_PREFIX,
+        filename_extension: str = DEFAULT_EXTENSION,
+        max_file_name_length: int = MAX_FILE_NAME_LENGTH,
+        backup_dir: str | Path | None = None,
     ):
         self.base_dir: Path | None = Path(base_dir) if base_dir else None
         self.auto_mode = auto_mode
@@ -181,8 +181,8 @@ class InteractiveFileRenamer:
             return patterns[0][0] if patterns else (DEFAULT_PREFIX, DEFAULT_EXTENSION)
         if choice <= len(patterns):
             return patterns[choice - 1][0]
-        prefix = input('Enter file prefix: ').strip()
-        ext = input('Enter file extension (with dot): ').strip().lower()
+        prefix = input("Enter file prefix: ").strip()
+        ext = input("Enter file extension (with dot): ").strip().lower()
         return prefix, ext
 
     def _interactive_model_selection(self, available_models: list[str]) -> str:
@@ -216,7 +216,8 @@ class InteractiveFileRenamer:
             return
         self.base_dir = self._interactive_directory_selection()
         self.filename_prefix, self.filename_extension = self._interactive_file_pattern_selection(
-            self.discover_file_patterns())
+            self.discover_file_patterns()
+        )
         self.model_name = self._interactive_model_selection(list_ollama_models())
         self.context_length = self._interactive_context_selection(self._get_model_max_context(self.model_name))
         self._print_summary()
@@ -226,7 +227,8 @@ class InteractiveFileRenamer:
         while True:
             choice = input(
                 f"\nModel max context: {max_context}. Enter characters to read per file, "
-                f"`500` will work (or press Enter for max): ").strip()
+                f"`500` will work (or press Enter for max): "
+            ).strip()
             if not choice:
                 return max_context
             if choice.isdigit() and 0 < int(choice) <= max_context:
@@ -289,7 +291,8 @@ class InteractiveFileRenamer:
             raise ValueError(f"Invalid directory: {self.base_dir}")
         ext = self.filename_extension.lower()
         return sorted(
-            p for p in self.base_dir.iterdir()
+            p
+            for p in self.base_dir.iterdir()
             if p.is_file() and p.name.startswith(self.filename_prefix) and p.name.lower().endswith(ext)
         )
 
@@ -325,16 +328,19 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         description="Rename files by their content with a local Ollama model.",
         epilog="Run `ollama-rename gui` for the desktop window.",
     )
-    parser.add_argument("-a", "--auto", action="store_true",
-                        help="Run in auto mode without interactive prompts (requires -d)")
+    parser.add_argument(
+        "-a", "--auto", action="store_true", help="Run in auto mode without interactive prompts (requires -d)"
+    )
     parser.add_argument("-d", "--directory", help="Specify directory non-interactively")
-    parser.add_argument('-m', '--model', default=DEFAULT_MODEL, help='Specify the Ollama model')
-    parser.add_argument('-c', '--context', type=int, default=DEFAULT_CONTEXT_LENGTH,
-                        help='Characters of each file to send to the model')
-    parser.add_argument('--prefix', default=DEFAULT_PREFIX, help="Specify the file prefix")
-    parser.add_argument('--ext', default=DEFAULT_EXTENSION, help="Specify the file extension")
-    parser.add_argument('-p', '--parallel', type=int, default=0,
-                        help='Number of parallel rename operations (default: sequential)')
+    parser.add_argument("-m", "--model", default=DEFAULT_MODEL, help="Specify the Ollama model")
+    parser.add_argument(
+        "-c", "--context", type=int, default=DEFAULT_CONTEXT_LENGTH, help="Characters of each file to send to the model"
+    )
+    parser.add_argument("--prefix", default=DEFAULT_PREFIX, help="Specify the file prefix")
+    parser.add_argument("--ext", default=DEFAULT_EXTENSION, help="Specify the file extension")
+    parser.add_argument(
+        "-p", "--parallel", type=int, default=0, help="Number of parallel rename operations (default: sequential)"
+    )
     args = parser.parse_args(argv)
     if args.auto and not args.directory:
         parser.error("--auto requires --directory")

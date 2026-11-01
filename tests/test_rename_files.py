@@ -47,6 +47,7 @@ def test_rename_does_not_overwrite_and_backs_up(tmp_path, monkeypatch):
 
 def test_parse_args_defaults_are_not_none():
     from ollama_rename_files.rename_files import parse_args
+
     args = parse_args(["-a", "-d", "."])
     assert None not in (args.model, args.context, args.prefix, args.ext)
 
@@ -108,6 +109,7 @@ def _tiny_pdf(text: str) -> bytes:
 
 def test_read_content_extracts_pdf_text(tmp_path):
     from ollama_rename_files.rename_files import read_content
+
     pdf = tmp_path / "new1.pdf"
     pdf.write_bytes(_tiny_pdf("Quarterly budget report"))
     assert "Quarterly budget report" in read_content(pdf, 2048)
@@ -118,6 +120,7 @@ def test_read_content_pdf_without_text_layer_fails(tmp_path):
     import pytest
 
     from ollama_rename_files.rename_files import read_content
+
     pdf = tmp_path / "new1.pdf"
     pdf.write_bytes(_tiny_pdf(""))
     with pytest.raises(ValueError, match="no text layer"):
@@ -126,6 +129,7 @@ def test_read_content_pdf_without_text_layer_fails(tmp_path):
 
 def test_read_content_drops_character_cut_by_byte_limit(tmp_path):
     from ollama_rename_files.rename_files import read_content
+
     path = tmp_path / "new1.txt"
     path.write_text("€" * 10, encoding="utf-8")  # 3-byte chars: the 8-byte read ends mid-character
     assert read_content(path, 2) == "€€"
@@ -135,6 +139,7 @@ def test_read_content_rejects_binary(tmp_path):
     import pytest
 
     from ollama_rename_files.rename_files import read_content
+
     path = tmp_path / "new1.bin"
     path.write_bytes(b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR")
     with pytest.raises(ValueError, match="binary"):

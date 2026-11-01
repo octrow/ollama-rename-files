@@ -1,4 +1,5 @@
 """`ollama-rename` runs the CLI; `ollama-rename gui` opens the desktop window."""
+
 import contextlib
 import sys
 

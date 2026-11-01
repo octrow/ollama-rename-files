@@ -1,4 +1,5 @@
 """Recreate the demo folder the README screenshots are taken from: python make_demo.py <dir>."""
+
 import shutil
 import sys
 from pathlib import Path

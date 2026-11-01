@@ -65,19 +65,19 @@ def _display_path(path: Path) -> str:
         return str(path)
 
 
-@app.route('/')
+@app.route("/")
 def index():
     return render_template("index.html")
 
 
-@app.get('/health')
+@app.get("/health")
 def health():
     return jsonify({"app": APP_ID, "pid": os.getpid()})
 
 
-@app.post('/set_directory')
+@app.post("/set_directory")
 def set_directory():
-    directory = Path((request.get_json(silent=True) or {}).get('directory', '')).expanduser()
+    directory = Path((request.get_json(silent=True) or {}).get("directory", "")).expanduser()
     if not directory.is_dir():
         return jsonify({"error": "That folder doesn't exist. Check the path and scan again."}), 400
     global current_dir
@@ -86,38 +86,38 @@ def set_directory():
     return jsonify({"directory": _display_path(directory), "patterns": patterns})
 
 
-@app.get('/models')
+@app.get("/models")
 def models():
     return jsonify(list_ollama_models())
 
 
-@app.post('/preview')
+@app.post("/preview")
 def preview():
     if not current_dir:
-        return jsonify({'error': 'Choose a folder first.'}), 400
+        return jsonify({"error": "Choose a folder first."}), 400
     data = request.get_json(silent=True) or {}
     renamer = InteractiveFileRenamer(
         base_dir=current_dir,
-        filename_prefix=data.get('prefix', ''),
-        filename_extension=data.get('extension', ''),
+        filename_prefix=data.get("prefix", ""),
+        filename_extension=data.get("extension", ""),
     )
     return jsonify([p.name for p in renamer.collect_files_to_rename()])
 
 
-@app.post('/rename_file')
+@app.post("/rename_file")
 def rename_file():
     """Rename one file. The first call of a run creates the backup folder; later calls pass its name back."""
     data = request.get_json(silent=True) or {}
-    path = _child(data.get('file'))
+    path = _child(data.get("file"))
     if not path or not path.is_file():
-        return jsonify({'error': 'File not found in the chosen folder.'}), 400
-    backup_dir = _backup_dir(data.get('backup_dir'))
-    if data.get('backup_dir') and not backup_dir:
-        return jsonify({'error': 'Backup folder is missing. Start the run again.'}), 400
+        return jsonify({"error": "File not found in the chosen folder."}), 400
+    backup_dir = _backup_dir(data.get("backup_dir"))
+    if data.get("backup_dir") and not backup_dir:
+        return jsonify({"error": "Backup folder is missing. Start the run again."}), 400
 
     renamer = InteractiveFileRenamer(
         base_dir=current_dir,
-        model_name=data.get('model') or DEFAULT_MODEL,
+        model_name=data.get("model") or DEFAULT_MODEL,
         backup_dir=backup_dir,
     )
     renamer.backup_dir = renamer.backup_dir or renamer.create_backup_directory()
@@ -126,10 +126,11 @@ def rename_file():
         return await renamer.analyze_and_rename(AsyncClient(), path)
 
     ok, message = asyncio.run(run())
-    return jsonify({'ok': ok, 'new_name' if ok else 'error': message, 'backup_dir': renamer.backup_dir.name})
+    return jsonify({"ok": ok, "new_name" if ok else "error": message, "backup_dir": renamer.backup_dir.name})
 
 
 # ---------- port selection ----------
+
 
 def port_is_free(port: int) -> bool:
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
@@ -212,14 +213,18 @@ def run(argv: list[str] | None = None) -> None:
         server.serve_forever()
         return
     if not has_window_backend():
-        print("No Qt or GTK bindings for a desktop window (see README, Linux).\n"
-              f"Opening {url} in your browser instead. Press Ctrl+C to stop.", flush=True)
+        print(
+            "No Qt or GTK bindings for a desktop window (see README, Linux).\n"
+            f"Opening {url} in your browser instead. Press Ctrl+C to stop.",
+            flush=True,
+        )
         webbrowser.open(url)
         server.serve_forever()
         return
     threading.Thread(target=server.serve_forever, daemon=True).start()
-    webview.create_window('File Renamer', url, js_api=Api(), width=880, height=680, min_size=(520, 480),
-                          text_select=True)
+    webview.create_window(
+        "File Renamer", url, js_api=Api(), width=880, height=680, min_size=(520, 480), text_select=True
+    )
     webview.start()
     server.shutdown()
 
