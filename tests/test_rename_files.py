@@ -30,7 +30,7 @@ def test_rename_does_not_overwrite_and_backs_up(tmp_path, monkeypatch):
         (tmp_path / name).write_text(name)
     (tmp_path / "other.md").write_text("skip me")
 
-    async def fake_generate(self, model, prompt, **kwargs):
+    async def fake_generate(self, model, prompt, **_kwargs):
         return {"response": "doc-same-name.md"}
 
     monkeypatch.setattr("ollama_rename_files.rename_files.AsyncClient.generate", fake_generate)
@@ -151,7 +151,7 @@ def test_broken_pdf_fails_only_that_file(tmp_path, monkeypatch):
     (tmp_path / "new2.pdf").write_bytes(_tiny_pdf("Meeting notes"))
     prompts = []
 
-    async def fake_generate(self, model, prompt, **kwargs):
+    async def fake_generate(self, model, prompt, **_kwargs):
         prompts.append(prompt)
         return {"response": "doc-meeting-notes.md"}
 
