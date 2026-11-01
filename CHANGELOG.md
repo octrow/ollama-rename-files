@@ -5,6 +5,8 @@ versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.3.5] - 2026-11-01
+
 ### Fixed
 
 - The desktop window renamed files in the folder scanned last, by any tab. With two tabs open (`--browser`, or the
@@ -113,6 +115,7 @@ First tagged release.
 
 Untagged: the original CLI and the first pywebview GUI.
 
+[0.3.5]: https://github.com/octrow/ollama-rename-files/releases/tag/v0.3.5
 [0.3.4]: https://github.com/octrow/ollama-rename-files/releases/tag/v0.3.4
 [0.3.3]: https://github.com/octrow/ollama-rename-files/releases/tag/v0.3.3
 [0.3.2]: https://github.com/octrow/ollama-rename-files/releases/tag/v0.3.2
