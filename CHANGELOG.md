@@ -5,6 +5,8 @@ versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.3.8] - 2026-11-02
+
 ### Fixed
 
 - A chatty reply line with a dash, like "Here is a name for your file - hope it helps!", became the file name. Lines
@@ -146,6 +148,7 @@ First tagged release.
 
 Untagged: the original CLI and the first pywebview GUI.
 
+[0.3.8]: https://github.com/octrow/ollama-rename-files/releases/tag/v0.3.8
 [0.3.7]: https://github.com/octrow/ollama-rename-files/releases/tag/v0.3.7
 [0.3.6]: https://github.com/octrow/ollama-rename-files/releases/tag/v0.3.6
 [0.3.5]: https://github.com/octrow/ollama-rename-files/releases/tag/v0.3.5
