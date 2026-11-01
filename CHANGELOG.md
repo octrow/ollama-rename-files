@@ -5,6 +5,13 @@ versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.3.3] - 2026-11-01
+
+### Changed
+
+- PyPI lists the supported Python versions, 3.10 to 3.13, and CI tests on all four. The code is the same as 0.3.2.
+- README (EN, RU): install from PyPI with `uv tool install` or `pipx install`, and a PyPI version badge.
+
 ## [0.3.2] - 2026-11-01
 
 ### Added
@@ -63,6 +70,7 @@ First tagged release.
 
 Untagged: the original CLI and the first pywebview GUI.
 
+[0.3.3]: https://github.com/octrow/ollama-rename-files/releases/tag/v0.3.3
 [0.3.2]: https://github.com/octrow/ollama-rename-files/releases/tag/v0.3.2
 [0.3.1]: https://github.com/octrow/ollama-rename-files/releases/tag/v0.3.1
 [0.3.0]: https://github.com/octrow/ollama-rename-files/releases/tag/v0.3.0
