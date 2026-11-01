@@ -95,4 +95,5 @@ def test_set_directory_shows_home_as_tilde(tmp_path, monkeypatch):
     monkeypatch.setenv("HOME", str(tmp_path))
     (tmp_path / "inbox").mkdir()
     response = gui.app.test_client().post("/set_directory", json={"directory": "~/inbox"})
+    assert response.json is not None
     assert response.json["directory"] == "~/inbox"

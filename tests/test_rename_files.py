@@ -41,6 +41,7 @@ def test_rename_does_not_overwrite_and_backs_up(tmp_path, monkeypatch):
     assert (renamed, failed, failed_files) == (2, 0, [])
     contents = {(tmp_path / n).read_text() for n in ("doc-same-name.txt", "doc-same-name-1.txt")}
     assert contents == {"new1.txt", "new2.txt"}
+    assert renamer.backup_dir is not None
     assert sorted(p.name for p in renamer.backup_dir.iterdir()) == ["new1.txt", "new2.txt"]
     assert (tmp_path / "other.md").exists()
 

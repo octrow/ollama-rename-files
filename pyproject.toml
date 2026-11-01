@@ -26,7 +26,11 @@ dependencies = [
 ]
 
 [dependency-groups]
-dev = ["pytest>=8", "ruff>=0.6"]
+dev = [
+    "pytest>=8",
+    "ruff>=0.6",
+    "ty>=0.0.95",
+]
 
 [project.urls]
 Homepage = "https://github.com/octrow/ollama-rename-files"

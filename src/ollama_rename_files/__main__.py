@@ -7,7 +7,7 @@ import sys
 def main() -> None:
     # legacy Windows code pages can't print every file name; replace what they can't encode
     with contextlib.suppress(AttributeError, ValueError):
-        sys.stdout.reconfigure(errors="replace")
+        sys.stdout.reconfigure(errors="replace")  # ty: ignore[unresolved-attribute] - suppressed above
     if sys.argv[1:2] == ["gui"]:
         from ollama_rename_files import app
 

@@ -106,7 +106,7 @@ def read_content(path: Path, limit: int) -> str:
 
 def list_ollama_models() -> list[str]:
     try:
-        return [m.model for m in Client().list().models]
+        return [m.model for m in Client().list().models if m.model]
     except Exception as e:  # noqa: BLE001 - Ollama down or unreachable: GUI/CLI fall back to a default
         logger.error(f"Error retrieving Ollama models: {e}")
         return []
@@ -136,6 +136,7 @@ class InteractiveFileRenamer:
         self._rename_lock = asyncio.Lock()
 
     def create_backup_directory(self) -> Path:
+        assert self.base_dir is not None, "base_dir is set before backups are made"
         backup_dir = unique_path(self.base_dir / f"backup_{datetime.now():%Y%m%d_%H%M%S}")
         backup_dir.mkdir(parents=True)
         return backup_dir
@@ -276,6 +277,7 @@ class InteractiveFileRenamer:
         """Copy to backup_dir, then rename to a free name. Never overwrites."""
         if new_filename == file_path.name:
             return True, file_path.name
+        assert self.base_dir is not None and self.backup_dir is not None, "rename_files sets both first"
         try:
             shutil.copy2(file_path, unique_path(self.backup_dir / file_path.name))
             new_file_path = unique_path(self.base_dir / new_filename)
