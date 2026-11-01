@@ -59,6 +59,25 @@ PROMPT_TEMPLATE = textwrap.dedent("""\
 
 FailedFiles = list[tuple[str, str]]
 
+# The context length is in characters; Ollama's window (num_ctx) is in tokens and is otherwise the server's default,
+# which silently cuts a longer prompt. Size the window from the characters instead.
+# ponytail: 2 characters a token is conservative for English (~4) and Cyrillic (~2.5); CJK (~1) can still be cut
+CHARS_PER_TOKEN = 2
+NUM_CTX_STEP = 1024  # one window per run: Ollama reloads the model whenever num_ctx changes
+MIN_NUM_CTX = 4096  # a common server default; never shrink below it, or a model already loaded at it is reloaded
+
+
+def context_window(context_chars: int, reply_tokens: int) -> int:
+    """num_ctx that holds the prompt template, `context_chars` of file text and the reply."""
+    tokens = (context_chars + len(PROMPT_TEMPLATE)) // CHARS_PER_TOKEN + reply_tokens
+    return max(MIN_NUM_CTX, -(-tokens // NUM_CTX_STEP) * NUM_CTX_STEP)
+
+
+def max_context_chars(model_tokens: int) -> int:
+    """How many characters of a file fit in a model with `model_tokens` of context, next to the prompt and reply."""
+    return max(1, (model_tokens - MAX_FILE_NAME_LENGTH) * CHARS_PER_TOKEN - len(PROMPT_TEMPLATE))
+
+
 # One lock for every renamer in the process: CLI workers share a renamer, GUI requests each build their own
 # on a threaded server. Picking a free name and renaming to it must not interleave, or one file replaces another.
 # ponytail: process-wide; two processes renaming in one folder at once (CLI + GUI) still race
@@ -267,7 +286,8 @@ class InteractiveFileRenamer:
             return available_models[choice - 1]
         return input("Enter full model name: ").strip()
 
-    def _get_model_max_context(self, model_name: str) -> int:
+    def _get_model_max_context(self, model_name: str) -> int | None:
+        """The model's context length in tokens, from `ollama show`; None if unknown."""
         try:
             modelinfo = Client(timeout=OLLAMA_INFO_TIMEOUT_S).show(model_name).modelinfo or {}
             for key, value in modelinfo.items():
@@ -276,7 +296,7 @@ class InteractiveFileRenamer:
             logger.warning(f"Could not determine context length for {model_name} (key not found)")
         except Exception as e:  # noqa: BLE001 - best effort, default is fine
             logger.warning(f"Could not retrieve model info: {e}")
-        return DEFAULT_CONTEXT_LENGTH
+        return None
 
     def interactive_configuration(self, given: Collection[str] = ()) -> None:
         """Ask for every setting except those in `given` (option names set on the command line)."""
@@ -295,17 +315,18 @@ class InteractiveFileRenamer:
         self._print_summary()
 
     @staticmethod
-    def _interactive_context_selection(max_context: int) -> int:
+    def _interactive_context_selection(model_tokens: int | None) -> int:
+        """Characters of each file to send; Enter = the default. Capped by what the model's context holds."""
+        limit = max_context_chars(model_tokens) if model_tokens else None
+        default = min(DEFAULT_CONTEXT_LENGTH, limit) if limit else DEFAULT_CONTEXT_LENGTH
+        bound = f", up to {limit}" if limit else ""
         while True:
-            choice = input(
-                f"\nModel max context: {max_context}. Enter characters to read per file, "
-                f"`500` will work (or press Enter for max): "
-            ).strip()
+            choice = input(f"\nCharacters of each file to send to the model (Enter for {default}{bound}): ").strip()
             if not choice:
-                return max_context
-            if choice.isdigit() and 0 < int(choice) <= max_context:
+                return default
+            if choice.isdecimal() and 0 < int(choice) <= (limit or int(choice)):
                 return int(choice)
-            print(f"Invalid context length. Please enter a number between 1 and {max_context}.")
+            print(f"Enter a number of characters from 1{' to ' + str(limit) if limit else ''}.")
 
     def _print_summary(self) -> None:
         print("\n--- Configuration Summary ---")
@@ -319,7 +340,10 @@ class InteractiveFileRenamer:
             self.model_name,
             PROMPT_TEMPLATE.format(content=content, max_len=self.max_file_name_length),
             think=False,
-            options={"num_predict": self.max_file_name_length},
+            options={
+                "num_predict": self.max_file_name_length,
+                "num_ctx": context_window(self.context_length, self.max_file_name_length),
+            },
         )
         return clean_model_response(response["response"])
 

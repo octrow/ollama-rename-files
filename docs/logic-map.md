@@ -56,7 +56,7 @@ All entry points end in `InteractiveFileRenamer.analyze_and_rename` per file. Th
 
 | Entry | Folder | Pattern | Model | Context (chars) | Parallel | Before renaming |
 |---|---|---|---|---|---|---|
-| `ollama-rename` (no `-a`) | `-d`, else asked | `--prefix`/`--ext` (other one defaults), else menu of top 5; Enter = most common | `-m`, else menu of installed; Enter = first | `-c`, else asked; Enter = model's `context_length` from `ollama show` | `-p`, default 0 → 1 | config summary, no file list, no confirm |
+| `ollama-rename` (no `-a`) | `-d`, else asked | `--prefix`/`--ext` (other one defaults), else menu of top 5; Enter = most common | `-m`, else menu of installed; Enter = first | `-c`, else asked; Enter = 2048, up to what the model's `context_length` holds | `-p`, default 0 → 1 | config summary, no file list, no confirm |
 | `ollama-rename -a -d DIR` | `-d` (required) | `--prefix new`, `--ext .txt` | `-m`, default `qwen2.5-coder:7b` | `-c`, default 2048 | `-p`, default 0 → 1 | nothing, starts at once |
 | `ollama-rename gui` | typed path or Browse; sent with every request | first discovered pattern pre-selected; a typed prefix switches to plain starts-with | dropdown of installed, first selected | fixed 2048 | 1 (JS loop) | file list shown; a prefix edit <250 ms before Rename still renames the old list |
 
@@ -80,7 +80,7 @@ Branches:
 - CLI `-a` → takes flags as they are; `-a` without `-d` → argparse error;
 - CLI without `-a` → asks only what the options left out: `-d` skips the folder, `--prefix` or `--ext` the pattern, `-m` the model, `-c` the context;
 - GUI → no server state: `/set_directory` checks the folder and discovers patterns; every `/preview` and `/rename_file` carries `directory`, plus prefix/extension or model.
-No Ollama: CLI prints "No Ollama models found. Using default model qwen2.5-coder:7b", context falls back to 2048; GUI disables the model dropdown and the Rename button.
+No Ollama: CLI prints "No Ollama models found. Using default model qwen2.5-coder:7b", the context prompt has no upper limit; GUI disables the model dropdown and the Rename button.
 Fails: CLI re-asks on invalid input; an invalid `-d` without `-a` → logged, exit 1. GUI: missing, empty or non-folder `directory` → 400.
 Module: `rename_files`, `app`
 
@@ -132,7 +132,8 @@ Module: `rename_files`
 Decides: the raw suggested name.
 `AsyncClient().generate(model, PROMPT_TEMPLATE, think=False, options={"num_predict": 128})`. Host from `OLLAMA_HOST`.
 The prompt is fixed and tuned for software notes: `<type> - <action> - <component> - <description>.<ext>`, lowercase, ≤128 chars.
-No `num_ctx` is passed: the server's default context window applies, whatever the context length chosen in step 2.
+`num_ctx` = (context chars + template) / 2 chars a token + 128, rounded up to 1024, at least 4096: 2048 chars → 4096, 20000 → 11264. One value per run, so the model loads once.
+Not capped by the model's trained length with `-c` or in the GUI; CJK text (~1 char a token) can still be cut.
 No Ollama: every file fails with "Ollama isn't reachable. Start it with `ollama serve` …".
 Fails: per file, no retry. Timeout 300 s (`ollama list`/`show`: 10 s) → "Ollama didn't answer in 300 s …". 404 → "Model X isn't installed. Run `ollama pull X`."; other errors → the error text.
 Module: `rename_files`
@@ -206,4 +207,4 @@ Module: `rename_files`, `app`
 ## Known gaps
 
 Short list; details and fixes are in the plan (number in brackets).
-- Context length is chosen in characters but Ollama's own context window is never set; CLI default is the model's token maximum (#4).
+- None open.

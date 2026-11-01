@@ -32,6 +32,9 @@ versions follow [Semantic Versioning](https://semver.org/).
   with "Ollama didn't answer in 300 s", and the model list after 10 s.
 - `-c 0` and negative `-c` values were accepted and failed every file; they are now rejected. An extension without
   the dot (`--ext txt`, or `txt` in the window) matched names like `notes.mytxt`; it now means `.txt`.
+- The context length was counted in characters, but Ollama's context window was left at the server's default, so a
+  long prompt could be cut. Each request now sets `num_ctx` to fit the prompt (at least 4096). In the interactive CLI,
+  Enter at the context prompt gives 2048 characters instead of the model's maximum in tokens.
 
 ## [0.3.4] - 2026-11-01
 

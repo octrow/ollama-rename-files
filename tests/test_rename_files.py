@@ -87,7 +87,7 @@ def test_cli_asks_only_what_the_options_left_out(tmp_path, monkeypatch):
     renamer.interactive_configuration(args.given)
 
     assert len(prompts) == 2  # pattern and context; folder and model came from the options
-    assert (renamer.base_dir, renamer.model_name, renamer.context_length) == (tmp_path, "second:1b", 4096)
+    assert (renamer.base_dir, renamer.model_name, renamer.context_length) == (tmp_path, "second:1b", 2048)
     assert (renamer.filename_prefix, renamer.filename_extension) == ("new", ".txt")
 
 
@@ -378,3 +378,32 @@ def test_extension_without_dot_matches_only_that_extension(tmp_path):
         (tmp_path / name).write_text("x")
     renamer = InteractiveFileRenamer(base_dir=tmp_path, filename_extension="txt")
     assert [p.name for p in renamer.collect_files_to_rename()] == ["new1.txt"]
+
+
+def test_model_gets_a_context_window_that_fits_the_prompt(monkeypatch):
+    from ollama_rename_files.rename_files import CHARS_PER_TOKEN, PROMPT_TEMPLATE, ollama_client
+
+    seen = []
+
+    async def fake_generate(self, model, prompt, **kwargs):
+        seen.append((len(prompt), kwargs["options"]["num_ctx"]))
+        return {"response": "doc-a-b.md"}
+
+    monkeypatch.setattr("ollama_rename_files.rename_files.AsyncClient.generate", fake_generate)
+    for chars in (2048, 20000):
+        renamer = InteractiveFileRenamer(context_length=chars)
+        asyncio.run(renamer.suggest_name(ollama_client(), "x" * chars))
+    (short_prompt, short_window), (long_prompt, long_window) = seen
+    assert short_window == 4096  # the common server default: a loaded model is not reloaded for a smaller window
+    assert long_window % 1024 == 0
+    assert long_window >= long_prompt // CHARS_PER_TOKEN + 128 > len(PROMPT_TEMPLATE)
+
+
+def test_interactive_context_is_in_characters(monkeypatch):
+    answers = iter(["", "999999", "50000"])
+    monkeypatch.setattr("builtins.input", lambda _prompt="": next(answers))
+    pick = InteractiveFileRenamer._interactive_context_selection
+    assert pick(32768) == 2048  # Enter: the default, not the model's token maximum
+    assert pick(32768) == 50000  # 999999 is over what 32768 tokens hold, so it asks again
+    answers = iter([""])
+    assert pick(None) == 2048  # model info unknown: no upper limit, default on Enter
