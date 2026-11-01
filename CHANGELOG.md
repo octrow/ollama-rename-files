@@ -5,6 +5,12 @@ versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+
+- A chatty reply line with a dash, like "Here is a name for your file - hope it helps!", became the file name. Lines
+  ending with `!` or `?`, or with more than three words before the first dash, are now skipped; a reply with nothing
+  else fails the file instead of renaming it.
+
 ## [0.3.7] - 2026-11-01
 
 ### Fixed

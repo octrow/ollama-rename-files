@@ -144,9 +144,9 @@ Module: `rename_files`
 Decides: which part of the reply is the name.
 Drops `<think>…</think>` (or an unclosed `<think>` to the end) and lines starting with ```` ``` ````.
 Per line: a `` `backticked` `` span wins; `*` and edge quotes go; a list marker (`1.`, `-`) and a short label (`File name:`) go.
-Takes the first line with a `-` or an `.ext` that doesn't end with `:`, lowercased.
+Takes the first line with a `-` or an `.ext`, not ending with `:`, `!` or `?`, and at most 3 words before its first dash, lowercased.
 Branches: no such line ("Sure!", a bare `readme`) → this file fails with "model returned no file name".
-A chatty line with a dash is taken: "Here is a name for your file - hope it helps!" → `here-is-a-name-for-your-file-hope-it-helps`.
+"Here is a name for your file - hope it helps!" is skipped; `bug fix - update - auth - token refresh.md` is taken.
 Module: `rename_files`
 
 ### 9. Sanitize
@@ -212,4 +212,4 @@ Module: `rename_files`, `app`
 ## Known gaps
 
 Short list; details and fixes are in the plan (number in brackets).
-- A chatty reply line with a dash becomes the name (#16).
+- None open.

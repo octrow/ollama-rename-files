@@ -35,6 +35,7 @@ OLLAMA_TIMEOUT_S = 300
 OLLAMA_INFO_TIMEOUT_S = 10  # `ollama list` / `ollama show` answer at once or not at all
 MAX_FILE_NAME_BYTES = 255  # ext4, APFS and NTFS limits; Cyrillic takes 2 bytes a character
 TOP_PATTERNS = 5
+MAX_TYPE_WORDS = 3  # words before the first dash of a name ("task", "bug fix"); more is a sentence
 FILE_LIST_LIMIT = 20  # files the interactive CLI lists before asking to rename
 
 PROMPT_TEMPLATE = textwrap.dedent("""\
@@ -109,8 +110,16 @@ def _name_in_line(line: str) -> str:
 
 
 def _looks_like_name(line: str) -> bool:
-    # ponytail: the prompt asks for `a - b - c.ext`, so a dash or an extension; a bare word like "readme" fails the file
-    return not line.endswith(":") and ("-" in line or re.search(r"\.\w{1,5}$", line) is not None)
+    """The prompt asks for `<type> - <action> - ….ext`, so a dash or an extension, and a short type before the dash.
+
+    Chatter fails: "Here is a name:", "… - hope it helps!", a sentence before the first dash.
+    ponytail: word-count heuristic; a bare word like "readme" or a chatty line fails the file, it is never renamed to it
+    """
+    if line.endswith((":", "!", "?")):
+        return False
+    if "-" in line and len(line.split("-", 1)[0].split()) > MAX_TYPE_WORDS:
+        return False
+    return "-" in line or re.search(r"\.\w{1,5}$", line) is not None
 
 
 def clean_model_response(text: str) -> str:

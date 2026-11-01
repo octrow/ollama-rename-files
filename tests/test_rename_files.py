@@ -493,3 +493,15 @@ def test_closed_input_ends_the_cli_with_a_hint(tmp_path, monkeypatch, capsys):
         rename_files.run(["-d", str(tmp_path)])
     assert stop.value.code == 1
     assert "-a" in capsys.readouterr().out
+
+
+def test_clean_model_response_skips_chatty_lines_with_a_dash():
+    reply = "Here is a name for your file - hope it helps!\nidea - add - gui - dark mode"
+    assert clean_model_response(reply) == "idea - add - gui - dark mode"
+    assert clean_model_response("Here is a name for your file - hope it helps.") == ""
+    assert clean_model_response("Is this ok - doc - api?") == ""
+    assert (
+        clean_model_response("bug fix - update - auth - token refresh.md")
+        == "bug fix - update - auth - token refresh.md"
+    )
+    assert clean_model_response("task-fix-api.md") == "task-fix-api.md"
