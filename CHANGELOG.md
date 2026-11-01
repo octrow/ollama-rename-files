@@ -5,6 +5,8 @@ versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.3.6] - 2026-11-01
+
 ### Fixed
 
 - A discovered pattern of files without an extension (`new1`, `new2`, `new3`) also renamed `new4.txt` and
@@ -126,6 +128,7 @@ First tagged release.
 
 Untagged: the original CLI and the first pywebview GUI.
 
+[0.3.6]: https://github.com/octrow/ollama-rename-files/releases/tag/v0.3.6
 [0.3.5]: https://github.com/octrow/ollama-rename-files/releases/tag/v0.3.5
 [0.3.4]: https://github.com/octrow/ollama-rename-files/releases/tag/v0.3.4
 [0.3.3]: https://github.com/octrow/ollama-rename-files/releases/tag/v0.3.3
