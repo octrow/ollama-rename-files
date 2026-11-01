@@ -25,4 +25,6 @@ jobs:
           enable-cache: false
       - run: uv sync --locked --python ${{ matrix.python }}
       - run: uv run ruff check .
+      - run: uv run ruff format --check .
+      - run: uv run ty check
       - run: uv run pytest -q
