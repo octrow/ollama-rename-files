@@ -123,4 +123,10 @@ jobs:
       - env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ github.ref_name }}
-        run: gh release create "$TAG" dist/* --repo "$GITHUB_REPOSITORY" --generate-notes --verify-tag
+        # notes: this version's CHANGELOG.md section, then GitHub's generated PR list
+        run: |
+          gh api "repos/$GITHUB_REPOSITORY/contents/CHANGELOG.md?ref=$TAG" -H "Accept: application/vnd.github.raw" \
+            | awk -v v="${TAG#v}" 'index($0, "## [" v "]") == 1 {p=1; next} /^## \[/ {p=0} p' \
+            | sed '/./,$!d' > notes.md
+          if [ -s notes.md ]; then printf '\n---\n' >> notes.md; else echo "::warning::CHANGELOG.md has no [${TAG#v}] section"; fi
+          gh release create "$TAG" dist/* --repo "$GITHUB_REPOSITORY" --notes-file notes.md --generate-notes --verify-tag
