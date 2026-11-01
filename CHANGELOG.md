@@ -5,6 +5,14 @@ versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.3.2] - 2026-11-01
+
+### Added
+
+- Published on PyPI: `uv tool install ollama-rename-files`, `pipx install ollama-rename-files` or
+  `pip install ollama-rename-files`. The code is the same as 0.3.1.
+- Release notes on GitHub start with the version's section of this changelog.
+
 ## [0.3.1] - 2026-11-01
 
 ### Fixed
@@ -55,5 +63,6 @@ First tagged release.
 
 Untagged: the original CLI and the first pywebview GUI.
 
+[0.3.2]: https://github.com/octrow/ollama-rename-files/releases/tag/v0.3.2
 [0.3.1]: https://github.com/octrow/ollama-rename-files/releases/tag/v0.3.1
 [0.3.0]: https://github.com/octrow/ollama-rename-files/releases/tag/v0.3.0
