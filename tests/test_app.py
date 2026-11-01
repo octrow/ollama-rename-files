@@ -156,3 +156,14 @@ def test_rename_file_reports_an_unwritable_folder_as_json(tmp_path, monkeypatch)
     assert response.status_code == 400
     assert "Can't create a backup folder" in response.json["error"]
     assert (tmp_path / "new1.txt").exists()
+
+
+def test_failed_rename_leaves_no_empty_backup_folder(tmp_path, monkeypatch):
+    async def fake_generate(self, model, prompt, **_kwargs):
+        raise ConnectionError("down")
+
+    monkeypatch.setattr("ollama_rename_files.rename_files.AsyncClient.generate", fake_generate)
+    client = _client(tmp_path)
+    result = client.post("/rename_file", json={"directory": str(tmp_path), "file": "new1.txt"}).json
+    assert not result["ok"] and result["backup_dir"] is None
+    assert not [p for p in tmp_path.iterdir() if p.name.startswith("backup_")]

@@ -339,3 +339,42 @@ def test_unwritable_folder_stops_the_run_with_a_clear_error(tmp_path, monkeypatc
     renamer = InteractiveFileRenamer(base_dir=tmp_path, auto_mode=True)
     with pytest.raises(ValueError, match="Can't create a backup folder"):
         asyncio.run(renamer.rename_files())
+
+
+def _fail_generate(monkeypatch):
+    async def fake_generate(self, model, prompt, **_kwargs):
+        raise ConnectionError("down")
+
+    monkeypatch.setattr("ollama_rename_files.rename_files.AsyncClient.generate", fake_generate)
+
+
+def test_run_where_nothing_was_renamed_leaves_no_backup_folder(tmp_path, monkeypatch):
+    _fail_generate(monkeypatch)
+    (tmp_path / "new1.txt").write_text("hello")
+    renamer = InteractiveFileRenamer(base_dir=tmp_path, auto_mode=True)
+    assert asyncio.run(renamer.rename_files())[:2] == (0, 1)
+    assert sorted(p.name for p in tmp_path.iterdir()) == ["new1.txt"]
+
+
+def test_ollama_client_has_a_timeout():
+    from ollama_rename_files.rename_files import OLLAMA_TIMEOUT_S, explain_ollama_error, ollama_client
+
+    assert ollama_client()._client.timeout.read == OLLAMA_TIMEOUT_S
+    import httpx
+
+    assert "didn't answer" in explain_ollama_error(httpx.ReadTimeout("timed out"), "tiny:1b")
+
+
+def test_context_must_be_positive():
+    from ollama_rename_files.rename_files import parse_args
+
+    for bad in ("0", "-1", "lots"):
+        with pytest.raises(SystemExit):
+            parse_args(["-a", "-d", ".", "-c", bad])
+
+
+def test_extension_without_dot_matches_only_that_extension(tmp_path):
+    for name in ("new1.txt", "new2.mytxt", "new3txt"):
+        (tmp_path / name).write_text("x")
+    renamer = InteractiveFileRenamer(base_dir=tmp_path, filename_extension="txt")
+    assert [p.name for p in renamer.collect_files_to_rename()] == ["new1.txt"]

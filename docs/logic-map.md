@@ -97,6 +97,7 @@ Module: `rename_files`
 
 Decides: the exact list of files to rename.
 Rule: the name starts with the prefix (case-sensitive) and `name.lower().endswith(ext.lower())`, sorted by name.
+An extension without a dot gets one: `txt` → `.txt`, so `notes.mytxt` is not taken.
 Whole-word prefix: the next character must not continue the prefix's last letter or digit run, as in step 3: `new` takes `new1.txt`, `new.txt`, `new note.txt`, not `newsletter.txt`; `2024` skips `20240101.md`.
 Branches:
 - empty prefix and empty extension (GUI fields cleared) → every file in the folder;
@@ -112,7 +113,7 @@ Decides: where originals are copied.
 Branches:
 - CLI: created once, after step 4 found ≥1 file, before any model call;
 - GUI: created by the first `/rename_file` of a run; JS sends its name back with every later file; a name that is not an existing `backup_*` folder in the request's folder → 400 "Backup folder is missing".
-No Ollama: still created, stays empty.
+No Ollama: created, then removed when no original was copied into it (CLI at the end of the run, GUI after each failed file).
 Fails: can't create (read-only folder) → "Can't create a backup folder in …": CLI logs it and exits 1 before any model call; GUI answers 400 and the row shows it.
 Module: `rename_files`, `app`
 
@@ -122,7 +123,7 @@ Decides: the text the model sees.
 In: file path, limit in characters. Out: string, at most `limit` characters.
 Branches: by file type (see the split table).
 Empty or whitespace-only text → this file fails with "file is empty", like a PDF without text.
-`-c` is not validated: `-c 0` fails every file as empty, a negative value fails every text file.
+`-c` must be a whole number ≥ 1; anything else is an argparse error before the run.
 Fails: any exception (pypdf errors, decode errors, OSError) → this file fails with the message, the run continues.
 Module: `rename_files`
 
@@ -133,7 +134,7 @@ Decides: the raw suggested name.
 The prompt is fixed and tuned for software notes: `<type> - <action> - <component> - <description>.<ext>`, lowercase, ≤128 chars.
 No `num_ctx` is passed: the server's default context window applies, whatever the context length chosen in step 2.
 No Ollama: every file fails with "Ollama isn't reachable. Start it with `ollama serve` …".
-Fails: per file, no retry, no timeout (a hung Ollama blocks the run and GUI Stop). 404 → "Model X isn't installed. Run `ollama pull X`."; other errors → the error text.
+Fails: per file, no retry. Timeout 300 s (`ollama list`/`show`: 10 s) → "Ollama didn't answer in 300 s …". 404 → "Model X isn't installed. Run `ollama pull X`."; other errors → the error text.
 Module: `rename_files`
 
 ### 8. Clean the reply

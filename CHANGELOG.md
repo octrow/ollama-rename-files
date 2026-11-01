@@ -26,6 +26,12 @@ versions follow [Semantic Versioning](https://semver.org/).
   second rename replaced the first file. Picking a name and renaming now happen under one lock for the whole process.
 - A folder where the backup can't be created (read-only) crashed the CLI with a traceback and showed a JSON parse
   error on every row in the window. Both now say "Can't create a backup folder in …".
+- A run where nothing was renamed (Ollama down, every file failed) left an empty `backup_<timestamp>/` folder. It is
+  now removed when no original was copied into it.
+- A hung Ollama blocked the run forever, and Stop in the window never took effect. Requests now time out after 300 s
+  with "Ollama didn't answer in 300 s", and the model list after 10 s.
+- `-c 0` and negative `-c` values were accepted and failed every file; they are now rejected. An extension without
+  the dot (`--ext txt`, or `txt` in the window) matched names like `notes.mytxt`; it now means `.txt`.
 
 ## [0.3.4] - 2026-11-01
 

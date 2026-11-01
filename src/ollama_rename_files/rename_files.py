@@ -1,6 +1,7 @@
 import argparse
 import asyncio
 import codecs
+import contextlib
 import logging
 import re
 import shutil
@@ -13,6 +14,7 @@ from collections.abc import Collection
 from datetime import datetime
 from pathlib import Path
 
+import httpx
 from ollama import AsyncClient, Client, ResponseError
 from pypdf import PdfReader
 
@@ -28,6 +30,9 @@ DEFAULT_CONTEXT_LENGTH = 2048
 DEFAULT_PREFIX = "new"
 DEFAULT_EXTENSION = ".txt"
 MAX_FILE_NAME_LENGTH = 128
+# a cold 7B model on a CPU can take minutes for its first answer; a hung Ollama must not block the run forever
+OLLAMA_TIMEOUT_S = 300
+OLLAMA_INFO_TIMEOUT_S = 10  # `ollama list` / `ollama show` answer at once or not at all
 MAX_FILE_NAME_BYTES = 255  # ext4, APFS and NTFS limits; Cyrillic takes 2 bytes a character
 TOP_PATTERNS = 5
 
@@ -149,12 +154,18 @@ def explain_ollama_error(error: Exception, model_name: str) -> str:
         return "Ollama isn't reachable. Start it with `ollama serve` (or the Ollama app), or set OLLAMA_HOST."
     if isinstance(error, ResponseError) and error.status_code == 404:
         return f"Model {model_name} isn't installed. Run `ollama pull {model_name}`."
-    return str(error)
+    if isinstance(error, httpx.TimeoutException):
+        return f"Ollama didn't answer in {OLLAMA_TIMEOUT_S} s. Try a smaller model or fewer characters (-c)."
+    return str(error) or type(error).__name__
+
+
+def ollama_client() -> AsyncClient:
+    return AsyncClient(timeout=OLLAMA_TIMEOUT_S)
 
 
 def list_ollama_models() -> list[str]:
     try:
-        return [m.model for m in Client().list().models if m.model]
+        return [m.model for m in Client(timeout=OLLAMA_INFO_TIMEOUT_S).list().models if m.model]
     except Exception as e:  # noqa: BLE001 - Ollama down or unreachable: GUI/CLI fall back to a default
         logger.error(f"Error retrieving Ollama models: {e}")
         return []
@@ -189,6 +200,12 @@ class InteractiveFileRenamer:
         except OSError as e:
             raise ValueError(f"Can't create a backup folder in {self.base_dir}: {e.strerror or e}") from e
         return backup_dir
+
+    def remove_backup_if_empty(self) -> None:
+        """Drop the backup folder when no original was copied into it (every file failed); keeps it otherwise."""
+        if self.backup_dir:
+            with contextlib.suppress(OSError):  # rmdir refuses a non-empty folder: exactly the check we want
+                self.backup_dir.rmdir()
 
     def discover_file_patterns(self) -> list[tuple[tuple[str, str], int]]:
         """Most common (prefix, extension) pairs among files in base_dir."""
@@ -252,7 +269,7 @@ class InteractiveFileRenamer:
 
     def _get_model_max_context(self, model_name: str) -> int:
         try:
-            modelinfo = Client().show(model_name).modelinfo or {}
+            modelinfo = Client(timeout=OLLAMA_INFO_TIMEOUT_S).show(model_name).modelinfo or {}
             for key, value in modelinfo.items():
                 if key.endswith(".context_length"):
                     return int(value)
@@ -346,6 +363,8 @@ class InteractiveFileRenamer:
         if not self.base_dir or not self.base_dir.is_dir():
             raise ValueError(f"Invalid directory: {self.base_dir}")
         ext = self.filename_extension.lower()
+        if ext and not ext.startswith("."):
+            ext = f".{ext}"  # "txt" means .txt, not every name ending in "txt"
         return sorted(
             p
             for p in self.base_dir.iterdir()
@@ -361,9 +380,10 @@ class InteractiveFileRenamer:
             return 0, 0, []
         logger.info(f"Found {len(files_to_rename)} files to rename")
         if self.backup_dir is None:
+            # created before any model call so a read-only folder stops the run at once; removed below if unused
             self.backup_dir = self.create_backup_directory()
 
-        client = AsyncClient()
+        client = ollama_client()
         semaphore = asyncio.Semaphore(max(parallel_count, 1))
         done = 0
 
@@ -377,8 +397,15 @@ class InteractiveFileRenamer:
             return result
 
         results = await asyncio.gather(*(worker(p) for p in files_to_rename))
+        self.remove_backup_if_empty()
         failed_files = [(p.name, msg) for p, (ok, msg) in zip(files_to_rename, results, strict=True) if not ok]
         return len(results) - len(failed_files), len(failed_files), failed_files
+
+
+def _positive_int(value: str) -> int:
+    if not value.isdecimal() or int(value) < 1:
+        raise argparse.ArgumentTypeError(f"expected a number of characters, 1 or more, got {value!r}")
+    return int(value)
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
@@ -394,7 +421,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument(
         "-c",
         "--context",
-        type=int,
+        type=_positive_int,
         help=f"Characters of each file to send to the model (default {DEFAULT_CONTEXT_LENGTH})",
     )
     parser.add_argument(

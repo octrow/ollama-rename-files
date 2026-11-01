@@ -17,10 +17,9 @@ from pathlib import Path
 
 import webview
 from flask import Flask, jsonify, render_template, request
-from ollama import AsyncClient
 from werkzeug.serving import make_server
 
-from ollama_rename_files.rename_files import DEFAULT_MODEL, InteractiveFileRenamer, list_ollama_models
+from ollama_rename_files.rename_files import DEFAULT_MODEL, InteractiveFileRenamer, list_ollama_models, ollama_client
 
 APP_ID = "ollama-rename-files"
 HOST = "127.0.0.1"
@@ -146,10 +145,13 @@ def rename_file():
             return jsonify({"error": str(e)}), 400
 
     async def run() -> tuple[bool, str]:
-        return await renamer.analyze_and_rename(AsyncClient(), path)
+        return await renamer.analyze_and_rename(ollama_client(), path)
 
     ok, message = asyncio.run(run())
-    return jsonify({"ok": ok, "new_name" if ok else "error": message, "backup_dir": renamer.backup_dir.name})
+    if not ok:
+        renamer.remove_backup_if_empty()  # the next file creates a fresh one; no empty backup_* is left behind
+    backup_name = renamer.backup_dir.name if renamer.backup_dir.is_dir() else None
+    return jsonify({"ok": ok, "new_name" if ok else "error": message, "backup_dir": backup_name})
 
 
 # ---------- port selection ----------
