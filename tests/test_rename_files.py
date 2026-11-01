@@ -5,6 +5,7 @@ import pytest
 from ollama_rename_files.rename_files import (
     InteractiveFileRenamer,
     clean_model_response,
+    read_content,
     sanitize_filename,
     unique_path,
 )
@@ -126,6 +127,39 @@ def test_discover_keeps_whole_leading_word(tmp_path):
 def test_clean_model_response_ignores_fence_language_tag():
     reply = "```md\nsnippet - create - utils - retry.md\n```"
     assert clean_model_response(reply) == "snippet - create - utils - retry.md"
+
+
+def test_clean_model_response_skips_chatter_around_the_name():
+    assert (
+        clean_model_response("Here is a file name:\n\ndoc - update - api - notes.md") == "doc - update - api - notes.md"
+    )
+    assert clean_model_response("**Filename:** `task-fix-api.md`") == "task-fix-api.md"
+    assert (
+        clean_model_response("File name: issue - fix - auth - token-expiry.md")
+        == "issue - fix - auth - token-expiry.md"
+    )
+    assert clean_model_response("Sure! Happy to help.") == ""
+    assert clean_model_response("1. snippet - create - db - index.sql") == "snippet - create - db - index.sql"
+    assert clean_model_response("- doc-update-readme.md") == "doc-update-readme.md"
+
+
+def test_sanitize_filename_keeps_non_latin_and_leading_digits():
+    assert sanitize_filename("заметка - про - бэкап", ".txt") == "заметка-про-бэкап.txt"
+    assert sanitize_filename("doc - update - notes - про бэкап", ".txt") == "doc-update-notes-про-бэкап.txt"
+    assert sanitize_filename("2024 - q3 - report", ".md") == "2024-q3-report.md"
+    assert sanitize_filename("-- _note_ --", ".md") == "note.md"
+
+
+def test_sanitize_filename_fits_255_bytes():
+    name = sanitize_filename("я" * 200, ".txt")
+    assert len(name.encode()) <= 255 and name.endswith(".txt")
+
+
+def test_read_content_rejects_empty_text(tmp_path):
+    for name, data in (("empty.txt", b""), ("blank.txt", b"  \n\t\n")):
+        (tmp_path / name).write_bytes(data)
+        with pytest.raises(ValueError, match="empty"):
+            read_content(tmp_path / name, 2048)
 
 
 def test_sanitize_filename_drops_commas():

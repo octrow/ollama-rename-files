@@ -27,6 +27,7 @@ DEFAULT_CONTEXT_LENGTH = 2048
 DEFAULT_PREFIX = "new"
 DEFAULT_EXTENSION = ".txt"
 MAX_FILE_NAME_LENGTH = 128
+MAX_FILE_NAME_BYTES = 255  # ext4, APFS and NTFS limits; Cyrillic takes 2 bytes a character
 TOP_PATTERNS = 5
 
 PROMPT_TEMPLATE = textwrap.dedent("""\
@@ -66,14 +67,27 @@ def matches_prefix(name: str, prefix: str, whole_prefix: bool = True) -> bool:
     return not (whole_prefix and prefix and rest and _same_run(prefix[-1], rest[0]))
 
 
+def _name_in_line(line: str) -> str:
+    """`**Filename:** `a-b.md`` → `a-b.md`; `File name: a-b.md` → `a-b.md`."""
+    span = re.search(r"`([^`]+)`", line)
+    if span:
+        line = span.group(1)
+    line = line.replace("*", "").strip().strip("`\"'")
+    line = re.sub(r"^(\d+[.)]|[-•])\s+", "", line)  # list markers: "1. a-b.md", "- a-b.md"
+    return re.sub(r"^[^\W\d_][\w ]{0,19}:\s+", "", line)  # a short label before the name
+
+
+def _looks_like_name(line: str) -> bool:
+    # ponytail: the prompt asks for `a - b - c.ext`, so a dash or an extension; a bare word like "readme" fails the file
+    return not line.endswith(":") and ("-" in line or re.search(r"\.\w{1,5}$", line) is not None)
+
+
 def clean_model_response(text: str) -> str:
-    """Extract the bare file name from a model reply (drops <think> blocks, fences, extra lines)."""
+    """The file name in a model reply: skips <think> blocks, fences and chatter like "Here is a name:"; "" if none."""
     text = re.sub(r"<think>.*?(</think>|$)", "", text, flags=re.DOTALL)
-    lines = [line.strip() for line in text.splitlines()]
-    # drop fence lines before stripping backticks, or "```md" leaves "md" behind
-    lines = [line.strip("`*\"'") for line in lines if not line.startswith("```")]
-    lines = [line for line in lines if line]
-    return lines[0].lower() if lines else ""
+    # drop fence lines before reading names, or "```md" leaves "md" behind
+    lines = [_name_in_line(line) for line in text.splitlines() if not line.strip().startswith("```")]
+    return next((line.lower() for line in lines if _looks_like_name(line)), "")
 
 
 def sanitize_filename(suggested_name: str, original_ext: str, max_len: int = MAX_FILE_NAME_LENGTH) -> str:
@@ -82,10 +96,12 @@ def sanitize_filename(suggested_name: str, original_ext: str, max_len: int = MAX
     name = re.sub(r'[<>/\\|?*:"+%!@]', "_", name)
     name = re.sub(r"\s+", "-", name)
     name = re.sub(r"-{2,}", "-", name)
-    name = re.sub(r"^[^a-zA-Z]+", "", name)
+    name = re.sub(r"^[\W_]+", "", name)
     name = name[: max_len - len(original_ext)]
-    name = re.sub(r"[^a-zA-Z0-9]+$", "", name)
-    if not name:
+    while len(f"{name}{original_ext}".encode()) > MAX_FILE_NAME_BYTES:
+        name = name[:-1]
+    name = re.sub(r"[\W_]+$", "", name)
+    if not any(c.isalpha() for c in name):  # "123" or "" says nothing about the file
         name = f"untitled-document-{uuid.uuid4().hex[:8]}"
     return f"{name}{original_ext}"
 
@@ -115,7 +131,10 @@ def read_content(path: Path, limit: int) -> str:
     if b"\0" in data:
         raise ValueError("binary or UTF-16 file, only UTF-8 text and PDF files are supported")
     # incremental decoder: a character cut in half by the read above is dropped, not an error
-    return codecs.getincrementaldecoder("utf-8")().decode(data)[:limit]
+    text = codecs.getincrementaldecoder("utf-8")().decode(data)[:limit]
+    if not text.strip():
+        raise ValueError("file is empty, nothing to name it by")
+    return text
 
 
 def explain_ollama_error(error: Exception, model_name: str) -> str:

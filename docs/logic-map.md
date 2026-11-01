@@ -121,8 +121,8 @@ Module: `rename_files`, `app`
 Decides: the text the model sees.
 In: file path, limit in characters. Out: string, at most `limit` characters.
 Branches: by file type (see the split table).
-Empty or whitespace-only text goes to the model as is (a PDF in the same state fails).
-`-c` is not validated: `-c 0` sends `""` for every file, a negative value fails every text file.
+Empty or whitespace-only text → this file fails with "file is empty", like a PDF without text.
+`-c` is not validated: `-c 0` fails every file as empty, a negative value fails every text file.
 Fails: any exception (pypdf errors, decode errors, OSError) → this file fails with the message, the run continues.
 Module: `rename_files`
 
@@ -137,19 +137,19 @@ Fails: per file, no retry, no timeout (a hung Ollama blocks the run and GUI Stop
 Module: `rename_files`
 
 ### 8. Clean the reply
-
 Decides: which part of the reply is the name.
-Drops `<think>…</think>` (or an unclosed `<think>` to the end), lines starting with ```` ``` ````, and `` ` * " ' `` around lines; takes the first non-empty line, lowercased.
-Branches: nothing left → this file fails with "model returned no file name".
-A chatty first line ("here is a name:") is taken as the name.
+Drops `<think>…</think>` (or an unclosed `<think>` to the end) and lines starting with ```` ``` ````.
+Per line: a `` `backticked` `` span wins; `*` and edge quotes go; a list marker (`1.`, `-`) and a short label (`File name:`) go.
+Takes the first line with a `-` or an `.ext` that doesn't end with `:`, lowercased.
+Branches: no such line ("Sure!", a bare `readme`) → this file fails with "model returned no file name".
 Module: `rename_files`
 
 ### 9. Sanitize
-
 Decides: the final file name.
-In order: drop a trailing `.ext`; delete `` . ` ' , ; ``; replace `< > / \ | ? * : " + % ! @` with `_`; whitespace → `-`; collapse `--`; strip everything before the first ASCII letter; cut to `128 − len(suffix)`; strip trailing non-ASCII-alphanumerics.
-The first rule drops any trailing `.\w+`: `release-notes-v2.0` → `release-notes-v2`. The last one drops a non-Latin tail: `doc - update - notes - про бэкап` → `doc-update-notes`.
-Branches: nothing left (e.g. an all-Cyrillic reply) → `untitled-document-<8 hex>`.
+In order: drop a trailing `.ext`; delete `` . ` ' , ; ``; replace `< > / \ | ? * : " + % ! @` with `_`; whitespace → `-`; collapse `--`; strip non-word characters at both ends; cut to `128 − len(suffix)` characters and to 255 bytes with the suffix.
+Any script and leading digits stay: `заметка - про - бэкап` → `заметка-про-бэкап`, `2024 - q3 - report` → `2024-q3-report`.
+The first rule drops any trailing `.\w+`: `release-notes-v2.0` → `release-notes-v2`.
+Branches: no letter left (`""`, `123`) → `untitled-document-<8 hex>`.
 Appends the original suffix with its original case.
 Module: `rename_files`
 
@@ -205,9 +205,6 @@ Module: `rename_files`, `app`
 ## Known gaps
 
 Short list; details and fixes are in the plan (number in brackets).
-- Empty text files are sent to the model and renamed to an invented name (#3).
 - Context length is chosen in characters but Ollama's own context window is never set; CLI default is the model's token maximum (#4).
-- Non-Latin text is cut from both ends: all-Cyrillic → `untitled-document-…`, `2024-q3-report` → `q3-report` (#5).
-- A chatty first line of the reply becomes the file name (#6).
 - Concurrent GUI requests can overwrite each other's target (#9).
 - A read-only folder crashes the CLI and breaks every GUI row (#10).

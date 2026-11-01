@@ -30,7 +30,7 @@ writers, people who dump quick notes into one inbox folder.
 - Works with any model you have installed in Ollama. Reasoning models work too: their `<think>` output is stripped.
 - The CLI can rename several files at once (`-p 4`).
 - Reads text files and the text layer of PDFs (`--ext .pdf`). Scanned PDFs without text and other
-  binary files are skipped with a reason.
+  binary files are skipped with a reason, and so are empty files.
 
 ## Install
 
@@ -140,7 +140,8 @@ Ollama on another machine or port? Set `OLLAMA_HOST`, e.g. `OLLAMA_HOST=http://1
    `newsletter.txt`) and the extension. A prefix typed in the desktop window matches any name that starts with it.
 2. Creates `backup_<timestamp>/` in that folder and copies each file there before renaming it.
 3. Sends the first `--context` characters of the file (for a PDF, of its extracted text) to your local Ollama model.
-4. Cleans the suggested name: lowercase, safe characters, at most 128 characters.
+4. Picks the name out of the reply (skipping chatter like "Here is a name:") and cleans it: lowercase, safe
+   characters, at most 128 characters. Names in any script work: `заметка-про-бэкап.txt`.
 5. Renames the file, keeping its original extension and never overwriting an existing file.
 6. Logs every action and prints which files failed and why.
 

@@ -15,6 +15,13 @@ versions follow [Semantic Versioning](https://semver.org/).
 - The prefix `new` also renamed `news.txt` and `newsletter.txt`, which pattern discovery counts as other groups. A
   picked pattern, `--prefix` and the CLI menu now match the prefix as a whole word; a prefix typed in the desktop window
   still matches any name that starts with it.
+- Empty or whitespace-only text files went to the model and got an invented name. They now fail with "file is empty",
+  like a PDF without text.
+- Names lost everything before the first Latin letter and after the last one: an all-Cyrillic name became
+  `untitled-document-…`, `2024-q3-report` became `q3-report`. Names in any script and leading digits now stay, cut to
+  255 bytes.
+- A chatty reply named the file after its first line (`here-is-a-file-name.txt`). The name is now the first line that
+  looks like one, with list markers, labels like `File name:` and Markdown removed; a reply without one fails the file.
 
 ## [0.3.4] - 2026-11-01
 
