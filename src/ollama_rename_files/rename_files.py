@@ -35,6 +35,7 @@ OLLAMA_TIMEOUT_S = 300
 OLLAMA_INFO_TIMEOUT_S = 10  # `ollama list` / `ollama show` answer at once or not at all
 MAX_FILE_NAME_BYTES = 255  # ext4, APFS and NTFS limits; Cyrillic takes 2 bytes a character
 TOP_PATTERNS = 5
+FILE_LIST_LIMIT = 20  # files the interactive CLI lists before asking to rename
 
 PROMPT_TEMPLATE = textwrap.dedent("""\
     The following text is from a file in a software development project:
@@ -383,18 +384,26 @@ class InteractiveFileRenamer:
         logger.info(f"Renamed: {file_path.name} -> {new_file_path.name}")
         return True, new_file_path.name
 
-    def collect_files_to_rename(self, whole_prefix: bool = True) -> list[Path]:
+    def collect_files_to_rename(self, as_discovered: bool = True) -> list[Path]:
+        """Files that match the pattern, sorted.
+
+        as_discovered (CLI, a pattern picked in the GUI): match as discovery counts the pattern, so the prefix is a
+        whole word and an empty extension means files without one. Otherwise (typed in the GUI): plain starts-with,
+        and an empty extension means any.
+        """
         if not self.base_dir or not self.base_dir.is_dir():
             raise ValueError(f"Invalid directory: {self.base_dir}")
         ext = self.filename_extension.lower()
         if ext and not ext.startswith("."):
             ext = f".{ext}"  # "txt" means .txt, not every name ending in "txt"
+
+        def has_extension(path: Path) -> bool:
+            return path.suffix == "" if as_discovered and not ext else path.name.lower().endswith(ext)
+
         return sorted(
             p
             for p in self.base_dir.iterdir()
-            if p.is_file()
-            and matches_prefix(p.name, self.filename_prefix, whole_prefix)
-            and p.name.lower().endswith(ext)
+            if p.is_file() and matches_prefix(p.name, self.filename_prefix, as_discovered) and has_extension(p)
         )
 
     async def rename_files(self, parallel_count: int = 0) -> tuple[int, int, FailedFiles]:
@@ -472,6 +481,19 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     return args
 
 
+def _confirm_files(files: list[Path]) -> bool:
+    """Interactive CLI: show the files that will change and rename them only on an explicit yes."""
+    if not files:
+        return True  # rename_files reports "No files found to rename."
+    print(f"\nFiles to rename ({len(files)}):")
+    for path in files[:FILE_LIST_LIMIT]:
+        print(f"  {path.name}")
+    if len(files) > FILE_LIST_LIMIT:
+        print(f"  ... and {len(files) - FILE_LIST_LIMIT} more")
+    files_word = "file" if len(files) == 1 else "files"
+    return input(f"Rename {len(files)} {files_word}? [y/N] ").strip().lower() in {"y", "yes", "д", "да"}
+
+
 async def _main(argv: list[str] | None) -> None:
     args = parse_args(argv)
     renamer = InteractiveFileRenamer(
@@ -484,6 +506,9 @@ async def _main(argv: list[str] | None) -> None:
     )
     try:
         renamer.interactive_configuration(args.given)
+        if not args.auto and not _confirm_files(renamer.collect_files_to_rename()):
+            print("Nothing renamed.")
+            return
         renamed_count, failed_count, failed_files = await renamer.rename_files(args.parallel)
     except ValueError as e:
         logger.error(str(e))

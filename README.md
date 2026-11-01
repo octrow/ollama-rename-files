@@ -109,7 +109,7 @@ system GTK bindings (`python3-gi`). Windows and macOS work out of the box.
 
 ```bash
 # Interactive: asks for the folder, the file pattern, the model and the context length.
-# Options you pass on the command line are not asked again.
+# Options you pass on the command line are not asked again. Lists the files and asks before renaming.
 ollama-rename
 
 # A folder, a model and 500 characters of each file; asks only for the file pattern

@@ -98,7 +98,7 @@ def test_collect_skips_longer_words_with_the_same_start(tmp_path):
     year = InteractiveFileRenamer(base_dir=tmp_path, filename_prefix="2024", filename_extension=".md")
     assert [p.name for p in new.collect_files_to_rename()] == ["new note.txt", "new.txt", "new1.txt"]
     assert [p.name for p in year.collect_files_to_rename()] == ["2024.md"]
-    assert len(new.collect_files_to_rename(whole_prefix=False)) == 5
+    assert len(new.collect_files_to_rename(as_discovered=False)) == 5
 
 
 def test_clean_model_response_handles_truncated_think():
@@ -407,3 +407,50 @@ def test_interactive_context_is_in_characters(monkeypatch):
     assert pick(32768) == 50000  # 999999 is over what 32768 tokens hold, so it asks again
     answers = iter([""])
     assert pick(None) == 2048  # model info unknown: no upper limit, default on Enter
+
+
+def _no_extension_folder(tmp_path):
+    for name in ("new1", "new2", "new3", "new4.txt", "new_report.pdf"):
+        (tmp_path / name).write_text("hello")
+
+
+def test_a_no_extension_group_takes_only_files_without_one(tmp_path):
+    _no_extension_folder(tmp_path)
+    renamer = InteractiveFileRenamer(base_dir=tmp_path)
+    renamer.filename_prefix, renamer.filename_extension = renamer.discover_file_patterns()[0][0]
+    assert (renamer.filename_prefix, renamer.filename_extension) == ("new", "")
+    assert [p.name for p in renamer.collect_files_to_rename()] == ["new1", "new2", "new3"]
+    assert len(renamer.collect_files_to_rename(as_discovered=False)) == 5  # a typed empty extension means any
+
+
+def _run_cli(tmp_path, monkeypatch, answer):
+    from ollama_rename_files import rename_files
+
+    calls = []
+
+    async def fake_generate(self, model, prompt, **_kwargs):
+        calls.append(prompt)
+        return {"response": "doc-hello.md"}
+
+    printed = []
+    monkeypatch.setattr("ollama_rename_files.rename_files.AsyncClient.generate", fake_generate)
+    monkeypatch.setattr("builtins.input", lambda prompt="": printed.append(prompt) or answer)
+    monkeypatch.setattr("builtins.print", lambda *args, **_kw: printed.append(" ".join(map(str, args))))
+    argv = ["-d", str(tmp_path), "-m", "tiny:1b", "-c", "100", "--prefix", "new", "--ext", ".txt"]
+    asyncio.run(rename_files._main(argv))
+    return calls, "\n".join(printed)
+
+
+def test_interactive_cli_lists_files_and_renames_nothing_without_yes(tmp_path, monkeypatch):
+    for name in ("new1.txt", "new2.txt"):
+        (tmp_path / name).write_text("hello")
+    calls, shown = _run_cli(tmp_path, monkeypatch, "")
+    assert calls == []
+    assert "new1.txt" in shown and "new2.txt" in shown and "Rename 2 files? [y/N]" in shown
+    assert sorted(p.name for p in tmp_path.iterdir()) == ["new1.txt", "new2.txt"]
+
+
+def test_interactive_cli_renames_after_yes(tmp_path, monkeypatch):
+    (tmp_path / "new1.txt").write_text("hello")
+    calls, _shown = _run_cli(tmp_path, monkeypatch, "y")
+    assert len(calls) == 1 and (tmp_path / "doc-hello.txt").exists()

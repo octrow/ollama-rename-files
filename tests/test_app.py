@@ -23,8 +23,8 @@ def test_preview_of_a_picked_pattern_skips_longer_words(tmp_path):
     client = _client(tmp_path)
     (tmp_path / "newsletter.txt").write_text("x")
     request = {"directory": str(tmp_path), "prefix": "new", "extension": ".txt"}
-    assert client.post("/preview", json={**request, "whole_prefix": True}).json == ["new1.txt"]
-    assert client.post("/preview", json={**request, "whole_prefix": False}).json == ["new1.txt", "newsletter.txt"]
+    assert client.post("/preview", json={**request, "as_discovered": True}).json == ["new1.txt"]
+    assert client.post("/preview", json={**request, "as_discovered": False}).json == ["new1.txt", "newsletter.txt"]
 
 
 def test_each_request_uses_the_folder_it_names(tmp_path, monkeypatch):
@@ -167,3 +167,12 @@ def test_failed_rename_leaves_no_empty_backup_folder(tmp_path, monkeypatch):
     result = client.post("/rename_file", json={"directory": str(tmp_path), "file": "new1.txt"}).json
     assert not result["ok"] and result["backup_dir"] is None
     assert not [p for p in tmp_path.iterdir() if p.name.startswith("backup_")]
+
+
+def test_preview_of_a_no_extension_chip_skips_files_with_one(tmp_path):
+    for name in ("new1", "new2", "new4.txt"):
+        (tmp_path / name).write_text("x")
+    client = gui.app.test_client()
+    request = {"directory": str(tmp_path), "prefix": "new", "extension": ""}
+    assert client.post("/preview", json={**request, "as_discovered": True}).json == ["new1", "new2"]
+    assert client.post("/preview", json={**request, "as_discovered": False}).json == ["new1", "new2", "new4.txt"]

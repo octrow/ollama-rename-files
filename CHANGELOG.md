@@ -5,6 +5,17 @@ versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+
+- A discovered pattern of files without an extension (`new1`, `new2`, `new3`) also renamed `new4.txt` and
+  `new_report.pdf`: an empty extension matched every name. For a pattern picked from the CLI menu or a chip in the
+  window, and for `--ext ""`, it now means files without an extension. An extension field left empty in the window
+  still means any.
+- The interactive CLI renamed files as soon as the questions were answered, so Enter at every prompt could rename a
+  whole folder, the current one by default. It now lists the files and asks `Rename N files? [y/N]`; `-a` doesn't ask.
+- In the window, editing a field and clicking Rename within 250 ms let the pending preview replace the list during
+  the run, hiding its progress. The pending preview is now cancelled when a run starts.
+
 ## [0.3.5] - 2026-11-01
 
 ### Fixed

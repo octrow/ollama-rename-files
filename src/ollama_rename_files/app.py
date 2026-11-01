@@ -115,8 +115,8 @@ def preview():
         filename_prefix=data.get("prefix", ""),
         filename_extension=data.get("extension", ""),
     )
-    # a picked pattern matches like discovery counted it; a typed prefix is a plain "starts with"
-    return jsonify([p.name for p in renamer.collect_files_to_rename(bool(data.get("whole_prefix", True)))])
+    # a picked pattern matches like discovery counted it; a typed prefix or extension is a plain "starts with" / any
+    return jsonify([p.name for p in renamer.collect_files_to_rename(bool(data.get("as_discovered", True)))])
 
 
 @app.post("/rename_file")

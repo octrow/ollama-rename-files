@@ -1,8 +1,8 @@
 const $ = (id) => document.getElementById(id);
 const PREVIEW_DELAY_MS = 250;
 
-// directory: the folder last scanned, sent with every request; wholePrefix: a picked pattern, not a typed prefix
-const state = {files: [], running: false, stopRequested: false, previewTimer: null, directory: null, wholePrefix: true};
+// directory: the folder last scanned, sent with every request; asDiscovered: a picked pattern, not a typed prefix or extension
+const state = {files: [], running: false, stopRequested: false, previewTimer: null, directory: null, asDiscovered: true};
 
 function showStatus(text, isError = false) {
     $('status').textContent = text;
@@ -54,7 +54,7 @@ function buildChip(prefix, ext, count, checked) {
 }
 
 function usePattern(prefix, extension) {
-    state.wholePrefix = true;
+    state.asDiscovered = true;
     $('prefix').value = prefix;
     $('extension').value = extension;
     preview();
@@ -131,7 +131,7 @@ async function preview() {
     try {
         const names = await postJson('/preview', {
             directory: state.directory,
-            whole_prefix: state.wholePrefix,
+            as_discovered: state.asDiscovered,
             prefix: $('prefix').value,
             extension: $('extension').value,
         });
@@ -142,7 +142,7 @@ async function preview() {
 }
 
 function schedulePreview() {
-    state.wholePrefix = false;
+    state.asDiscovered = false;
     clearTimeout(state.previewTimer);
     state.previewTimer = setTimeout(preview, PREVIEW_DELAY_MS);
     document.querySelectorAll('input[name="pattern"]').forEach((r) => { r.checked = false; });
@@ -210,6 +210,7 @@ async function renameAll() {
     const model = $('model').value;
     let backupDir = null;
 
+    clearTimeout(state.previewTimer);  // a preview pending from the last keystroke must not replace the rows mid-run
     state.running = true;
     state.stopRequested = false;
     setInputsLocked(true);
