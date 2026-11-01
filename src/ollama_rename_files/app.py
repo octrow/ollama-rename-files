@@ -139,7 +139,11 @@ def rename_file():
         model_name=data.get("model") or DEFAULT_MODEL,
         backup_dir=backup_dir,
     )
-    renamer.backup_dir = renamer.backup_dir or renamer.create_backup_directory()
+    if not renamer.backup_dir:
+        try:
+            renamer.backup_dir = renamer.create_backup_directory()
+        except ValueError as e:  # read-only folder: say so, don't answer with an HTML 500
+            return jsonify({"error": str(e)}), 400
 
     async def run() -> tuple[bool, str]:
         return await renamer.analyze_and_rename(AsyncClient(), path)

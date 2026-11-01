@@ -296,3 +296,46 @@ def test_ollama_errors_say_what_to_do(tmp_path, monkeypatch):
     messages = dict(failed_files)
     assert "ollama serve" in messages["new1.txt"]
     assert "ollama pull tiny:1b" in messages["new2.txt"]
+
+
+def test_two_renamers_never_take_the_same_name(tmp_path, monkeypatch):
+    # the GUI builds one renamer per request on a threaded server: two requests at once must not overwrite each other
+    import threading
+    import time
+
+    from ollama_rename_files import rename_files
+
+    real_unique_path = rename_files.unique_path
+
+    def slow_unique_path(path):
+        free = real_unique_path(path)
+        time.sleep(0.05)  # widen the gap between picking a free name and using it
+        return free
+
+    monkeypatch.setattr(rename_files, "unique_path", slow_unique_path)
+    backup = tmp_path / "backup_x"
+    backup.mkdir()
+    for name in ("new1.txt", "new2.txt"):
+        (tmp_path / name).write_text(name)
+    renamers = [InteractiveFileRenamer(base_dir=tmp_path, backup_dir=backup) for _ in range(2)]
+    threads = [
+        threading.Thread(target=r._backup_and_rename, args=(tmp_path / n, "doc.txt"))
+        for r, n in zip(renamers, ("new1.txt", "new2.txt"), strict=True)
+    ]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join()
+
+    assert {(tmp_path / n).read_text() for n in ("doc.txt", "doc-1.txt")} == {"new1.txt", "new2.txt"}
+
+
+def test_unwritable_folder_stops_the_run_with_a_clear_error(tmp_path, monkeypatch):
+    def refuse(self, *args, **kwargs):
+        raise PermissionError(13, "Permission denied", str(self))
+
+    (tmp_path / "new1.txt").write_text("x")
+    monkeypatch.setattr("pathlib.Path.mkdir", refuse)
+    renamer = InteractiveFileRenamer(base_dir=tmp_path, auto_mode=True)
+    with pytest.raises(ValueError, match="Can't create a backup folder"):
+        asyncio.run(renamer.rename_files())

@@ -144,3 +144,15 @@ def test_requests_from_other_hosts_are_refused(tmp_path):
     response = client.post("/set_directory", json={"directory": str(tmp_path)}, headers={"Host": "evil.example:5000"})
     assert response.status_code == 403
     assert client.get("/health", headers={"Host": "127.0.0.1:5000"}).status_code == 200
+
+
+def test_rename_file_reports_an_unwritable_folder_as_json(tmp_path, monkeypatch):
+    def refuse(self, *args, **kwargs):
+        raise PermissionError(13, "Permission denied", str(self))
+
+    client = _client(tmp_path)
+    monkeypatch.setattr("pathlib.Path.mkdir", refuse)
+    response = client.post("/rename_file", json={"directory": str(tmp_path), "file": "new1.txt"})
+    assert response.status_code == 400
+    assert "Can't create a backup folder" in response.json["error"]
+    assert (tmp_path / "new1.txt").exists()

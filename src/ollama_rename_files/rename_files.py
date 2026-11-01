@@ -6,6 +6,7 @@ import re
 import shutil
 import sys
 import textwrap
+import threading
 import uuid
 from collections import Counter
 from collections.abc import Collection
@@ -52,6 +53,11 @@ PROMPT_TEMPLATE = textwrap.dedent("""\
     """)
 
 FailedFiles = list[tuple[str, str]]
+
+# One lock for every renamer in the process: CLI workers share a renamer, GUI requests each build their own
+# on a threaded server. Picking a free name and renaming to it must not interleave, or one file replaces another.
+# ponytail: process-wide; two processes renaming in one folder at once (CLI + GUI) still race
+_RENAME_LOCK = threading.Lock()
 
 
 def _same_run(a: str, b: str) -> bool:
@@ -174,13 +180,14 @@ class InteractiveFileRenamer:
         self.filename_extension = filename_extension
         self.max_file_name_length = max_file_name_length
         self.backup_dir: Path | None = Path(backup_dir) if backup_dir else None
-        # serialize backup+rename so parallel workers can't pick the same free name
-        self._rename_lock = asyncio.Lock()
 
     def create_backup_directory(self) -> Path:
         assert self.base_dir is not None, "base_dir is set before backups are made"
         backup_dir = unique_path(self.base_dir / f"backup_{datetime.now():%Y%m%d_%H%M%S}")
-        backup_dir.mkdir(parents=True)
+        try:
+            backup_dir.mkdir(parents=True)
+        except OSError as e:
+            raise ValueError(f"Can't create a backup folder in {self.base_dir}: {e.strerror or e}") from e
         return backup_dir
 
     def discover_file_patterns(self) -> list[tuple[tuple[str, str], int]]:
@@ -317,8 +324,7 @@ class InteractiveFileRenamer:
             return False, explain_ollama_error(e, self.model_name)
 
         new_filename = sanitize_filename(suggested_name, file_path.suffix, self.max_file_name_length)
-        async with self._rename_lock:
-            return self._backup_and_rename(file_path, new_filename)
+        return self._backup_and_rename(file_path, new_filename)
 
     def _backup_and_rename(self, file_path: Path, new_filename: str) -> tuple[bool, str]:
         """Copy to backup_dir, then rename to a free name. Never overwrites."""
@@ -326,9 +332,10 @@ class InteractiveFileRenamer:
             return True, file_path.name
         assert self.base_dir is not None and self.backup_dir is not None, "rename_files sets both first"
         try:
-            shutil.copy2(file_path, unique_path(self.backup_dir / file_path.name))
-            new_file_path = unique_path(self.base_dir / new_filename)
-            file_path.rename(new_file_path)
+            with _RENAME_LOCK:
+                shutil.copy2(file_path, unique_path(self.backup_dir / file_path.name))
+                new_file_path = unique_path(self.base_dir / new_filename)
+                file_path.rename(new_file_path)
         except OSError as e:
             logger.error(f"Backup/rename failed for {file_path.name}: {e}")
             return False, str(e)

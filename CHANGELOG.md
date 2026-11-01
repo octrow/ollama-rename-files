@@ -22,6 +22,10 @@ versions follow [Semantic Versioning](https://semver.org/).
   255 bytes.
 - A chatty reply named the file after its first line (`here-is-a-file-name.txt`). The name is now the first line that
   looks like one, with list markers, labels like `File name:` and Markdown removed; a reply without one fails the file.
+- Two desktop-window requests renaming at the same moment could pick the same free name, and on Linux and macOS the
+  second rename replaced the first file. Picking a name and renaming now happen under one lock for the whole process.
+- A folder where the backup can't be created (read-only) crashed the CLI with a traceback and showed a JSON parse
+  error on every row in the window. Both now say "Can't create a backup folder in …".
 
 ## [0.3.4] - 2026-11-01
 

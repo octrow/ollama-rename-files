@@ -113,7 +113,7 @@ Branches:
 - CLI: created once, after step 4 found ≥1 file, before any model call;
 - GUI: created by the first `/rename_file` of a run; JS sends its name back with every later file; a name that is not an existing `backup_*` folder in the request's folder → 400 "Backup folder is missing".
 No Ollama: still created, stays empty.
-Fails: can't create (read-only folder) → CLI traceback (only `ValueError` is caught); GUI HTML 500, every row shows a JSON parse error.
+Fails: can't create (read-only folder) → "Can't create a backup folder in …": CLI logs it and exits 1 before any model call; GUI answers 400 and the row shows it.
 Module: `rename_files`, `app`
 
 ### 6. Read content
@@ -156,7 +156,7 @@ Module: `rename_files`
 ### 10. Backup and rename
 
 Decides: the free target name; never overwrites.
-Runs under one `asyncio.Lock` per renamer so CLI workers can't take the same name. The GUI builds a renamer per request on a threaded server: two concurrent requests are not serialized.
+Runs under one process-wide `threading.Lock`, so CLI workers and concurrent GUI requests can't take the same name. Two processes renaming in one folder at once still race.
 Branches:
 - new name == old name → success, no copy, no rename;
 - else `copy2` to the backup folder (free name), then rename to a free name (`-1`, `-2`, …).
@@ -206,5 +206,3 @@ Module: `rename_files`, `app`
 
 Short list; details and fixes are in the plan (number in brackets).
 - Context length is chosen in characters but Ollama's own context window is never set; CLI default is the model's token maximum (#4).
-- Concurrent GUI requests can overwrite each other's target (#9).
-- A read-only folder crashes the CLI and breaks every GUI row (#10).
