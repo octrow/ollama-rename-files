@@ -43,7 +43,7 @@ def test_each_request_uses_the_folder_it_names(tmp_path, monkeypatch):
 
     result = client.post("/rename_file", json={"directory": str(x), "file": "new1.txt"}).json
 
-    assert result["ok"] and (x / "doc-hello.txt").exists()
+    assert result is not None and result["ok"] and (x / "doc-hello.txt").exists()
     assert sorted(p.name for p in y.iterdir()) == ["new1.txt"]
 
 
