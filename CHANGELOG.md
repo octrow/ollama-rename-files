@@ -5,6 +5,16 @@ versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+
+- An empty `backup_<timestamp>/` folder was left when the window renamed a file to the name it already had, and when
+  the CLI was stopped with Ctrl+C. Both now remove it when no original was copied into it.
+- A folder the app can't read showed a JSON parse error in the window and a traceback in the CLI. Both now say
+  "Can't read <folder>: <reason>".
+- No more tracebacks for: the CLI asking questions with no input (piped stdin without `-a`), a `FILE_RENAMER_PORT`
+  or `--port` that isn't a port number, no free port, or a running instance that won't stop. Each prints what went
+  wrong and exits with an error.
+
 ## [0.3.6] - 2026-11-01
 
 ### Fixed

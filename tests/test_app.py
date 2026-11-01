@@ -176,3 +176,48 @@ def test_preview_of_a_no_extension_chip_skips_files_with_one(tmp_path):
     request = {"directory": str(tmp_path), "prefix": "new", "extension": ""}
     assert client.post("/preview", json={**request, "as_discovered": True}).json == ["new1", "new2"]
     assert client.post("/preview", json={**request, "as_discovered": False}).json == ["new1", "new2", "new4.txt"]
+
+
+def test_rename_to_the_same_name_leaves_no_empty_backup_folder(tmp_path, monkeypatch):
+    async def same_name(self, model, prompt, **_kwargs):
+        return {"response": "task - x"}
+
+    monkeypatch.setattr("ollama_rename_files.rename_files.AsyncClient.generate", same_name)
+    (tmp_path / "task-x.txt").write_text("hello")
+    result = gui.app.test_client().post("/rename_file", json={"directory": str(tmp_path), "file": "task-x.txt"}).json
+    assert result == {"ok": True, "new_name": "task-x.txt", "backup_dir": None}
+    assert sorted(p.name for p in tmp_path.iterdir()) == ["task-x.txt"]
+
+
+def test_unreadable_folder_is_a_json_error(tmp_path, monkeypatch):
+    def refuse(self):
+        raise PermissionError(13, "Permission denied", str(self))
+
+    monkeypatch.setattr("pathlib.Path.iterdir", refuse)
+    client = gui.app.test_client()
+    request = {"directory": str(tmp_path), "prefix": "new", "extension": ".txt"}
+    for url in ("/set_directory", "/preview"):
+        response = client.post(url, json=request)
+        body = response.json
+        assert response.status_code == 400 and body is not None and "Can't read" in body["error"]
+
+
+def test_bad_port_setting_is_an_error_not_a_traceback(monkeypatch):
+    monkeypatch.setattr(gui, "make_server", lambda *_args, **_kwargs: pytest.fail("must not serve"))
+    monkeypatch.setenv("FILE_RENAMER_PORT", "five thousand")
+    with pytest.raises(SystemExit) as stop:
+        gui.run([])
+    assert stop.value.code == 2
+    with pytest.raises(SystemExit):
+        gui.run(["--port", "99999"])
+
+
+def test_no_free_port_ends_with_a_message(monkeypatch, capsys):
+    def busy(_port, ask=None):
+        raise RuntimeError("No free port in 5000-5049")
+
+    monkeypatch.setattr(gui, "choose_port", busy)
+    with pytest.raises(SystemExit) as stop:
+        gui.run(["--port", "5000"])
+    assert stop.value.code == 1
+    assert "No free port" in capsys.readouterr().out

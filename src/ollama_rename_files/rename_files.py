@@ -227,16 +227,23 @@ class InteractiveFileRenamer:
             with contextlib.suppress(OSError):  # rmdir refuses a non-empty folder: exactly the check we want
                 self.backup_dir.rmdir()
 
+    def _files(self) -> list[Path]:
+        """Files directly in base_dir; an unreadable folder is a ValueError with the reason, like an invalid one."""
+        assert self.base_dir is not None, "callers check base_dir first"
+        try:
+            return [p for p in self.base_dir.iterdir() if p.is_file()]
+        except OSError as e:
+            raise ValueError(f"Can't read {self.base_dir}: {e.strerror or e}") from e
+
     def discover_file_patterns(self) -> list[tuple[tuple[str, str], int]]:
         """Most common (prefix, extension) pairs among files in base_dir."""
         if not self.base_dir or not self.base_dir.is_dir():
             raise ValueError("Invalid directory")
         patterns = Counter()
-        for path in self.base_dir.iterdir():
-            if path.is_file():
-                prefix_match = re.match(r"^([^\W\d_]+|\d+|[^.\w]+)", path.name)
-                if prefix_match:
-                    patterns[(prefix_match.group(1), path.suffix.lower())] += 1
+        for path in self._files():
+            prefix_match = re.match(r"^([^\W\d_]+|\d+|[^.\w]+)", path.name)
+            if prefix_match:
+                patterns[(prefix_match.group(1), path.suffix.lower())] += 1
         return patterns.most_common(TOP_PATTERNS)
 
     @staticmethod
@@ -401,9 +408,7 @@ class InteractiveFileRenamer:
             return path.suffix == "" if as_discovered and not ext else path.name.lower().endswith(ext)
 
         return sorted(
-            p
-            for p in self.base_dir.iterdir()
-            if p.is_file() and matches_prefix(p.name, self.filename_prefix, as_discovered) and has_extension(p)
+            p for p in self._files() if matches_prefix(p.name, self.filename_prefix, as_discovered) and has_extension(p)
         )
 
     async def rename_files(self, parallel_count: int = 0) -> tuple[int, int, FailedFiles]:
@@ -429,8 +434,10 @@ class InteractiveFileRenamer:
                 logger.info(f"Progress: {done}/{len(files_to_rename)}")
             return result
 
-        results = await asyncio.gather(*(worker(p) for p in files_to_rename))
-        self.remove_backup_if_empty()
+        try:
+            results = await asyncio.gather(*(worker(p) for p in files_to_rename))
+        finally:  # Ctrl+C too: an unused backup folder must not stay behind
+            self.remove_backup_if_empty()
         failed_files = [(p.name, msg) for p, (ok, msg) in zip(files_to_rename, results, strict=True) if not ok]
         return len(results) - len(failed_files), len(failed_files), failed_files
 
@@ -528,6 +535,9 @@ def run(argv: list[str] | None = None) -> None:
         asyncio.run(_main(argv))
     except KeyboardInterrupt:
         print("\nOperation interrupted by user.")
+    except EOFError:  # stdin closed or piped: nobody can answer the questions
+        print("\nNo input to answer the questions. Run with -a -d DIR to rename without them.")
+        sys.exit(1)
 
 
 if __name__ == "__main__":

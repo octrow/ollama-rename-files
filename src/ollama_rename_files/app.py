@@ -25,7 +25,9 @@ APP_ID = "ollama-rename-files"
 HOST = "127.0.0.1"
 # The API renames files anywhere on disk: only the local page may call it, not a DNS-rebinding web page
 ALLOWED_HOSTS = {HOST, "localhost"}
-DEFAULT_PORT = int(os.environ.get("FILE_RENAMER_PORT", "5000"))
+PORT_ENV = "FILE_RENAMER_PORT"
+FALLBACK_PORT = 5000
+MAX_PORT = 65535
 PORT_SEARCH_RANGE = 50
 HEALTH_TIMEOUT_S = 1.0
 RESTART_TIMEOUT_S = 5.0
@@ -95,7 +97,10 @@ def set_directory():
     directory = _folder(request.get_json(silent=True) or {})
     if not directory:
         return jsonify({"error": "That folder doesn't exist. Check the path and scan again."}), 400
-    patterns = InteractiveFileRenamer(base_dir=directory).discover_file_patterns()
+    try:
+        patterns = InteractiveFileRenamer(base_dir=directory).discover_file_patterns()
+    except ValueError as e:  # unreadable folder: a JSON error the page can show, not an HTML 500
+        return jsonify({"error": str(e)}), 400
     return jsonify({"directory": _display_path(directory), "patterns": patterns})
 
 
@@ -116,7 +121,11 @@ def preview():
         filename_extension=data.get("extension", ""),
     )
     # a picked pattern matches like discovery counted it; a typed prefix or extension is a plain "starts with" / any
-    return jsonify([p.name for p in renamer.collect_files_to_rename(bool(data.get("as_discovered", True)))])
+    try:
+        files = renamer.collect_files_to_rename(bool(data.get("as_discovered", True)))
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
+    return jsonify([p.name for p in files])
 
 
 @app.post("/rename_file")
@@ -148,8 +157,8 @@ def rename_file():
         return await renamer.analyze_and_rename(ollama_client(), path)
 
     ok, message = asyncio.run(run())
-    if not ok:
-        renamer.remove_backup_if_empty()  # the next file creates a fresh one; no empty backup_* is left behind
+    # failed, or kept its own name: nothing was copied, so drop the folder; the next file creates a fresh one
+    renamer.remove_backup_if_empty()
     backup_name = renamer.backup_dir.name if renamer.backup_dir.is_dir() else None
     return jsonify({"ok": ok, "new_name" if ok else "error": message, "backup_dir": backup_name})
 
@@ -222,13 +231,29 @@ def has_window_backend() -> bool:
     return not sys.platform.startswith("linux") or any(importlib.util.find_spec(m) for m in ("qtpy", "gi"))
 
 
+def _port(value: str) -> int:
+    if not value.isdecimal() or not 0 < int(value) <= MAX_PORT:
+        raise argparse.ArgumentTypeError(f"expected a port number from 1 to {MAX_PORT}, got {value!r}")
+    return int(value)
+
+
 def run(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(prog="ollama-rename gui", description="File Renamer desktop window")
-    parser.add_argument("--port", type=int, default=DEFAULT_PORT, help=f"Preferred port (default {DEFAULT_PORT})")
+    parser.add_argument("--port", type=_port, help=f"Preferred port (default ${PORT_ENV}, else {FALLBACK_PORT})")
     parser.add_argument("--browser", action="store_true", help="Only serve the UI and print its link, no window")
     args = parser.parse_args(argv)
+    preferred = args.port
+    if preferred is None:
+        try:
+            preferred = _port(os.environ.get(PORT_ENV, str(FALLBACK_PORT)))
+        except argparse.ArgumentTypeError as e:
+            parser.error(f"{PORT_ENV}: {e}")
 
-    port = choose_port(args.port)
+    try:
+        port = choose_port(preferred)
+    except (RuntimeError, OSError) as e:  # no free port, or the running instance won't stop
+        print(f"Can't start File Renamer: {e}", flush=True)
+        sys.exit(1)
     if port is None:
         return
     server = make_server(HOST, port, app, threaded=True)

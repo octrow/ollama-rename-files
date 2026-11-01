@@ -81,7 +81,7 @@ Branches:
 - CLI without `-a` → asks only what the options left out: `-d` skips the folder, `--prefix` or `--ext` the pattern, `-m` the model, `-c` the context;
 - GUI → no server state: `/set_directory` checks the folder and discovers patterns; every `/preview` and `/rename_file` carries `directory`, plus prefix/extension or model.
 No Ollama: CLI prints "No Ollama models found. Using default model qwen2.5-coder:7b", the context prompt has no upper limit; GUI disables the model dropdown and the Rename button.
-Fails: CLI re-asks on invalid input; an invalid `-d` without `-a` → logged, exit 1 (with `--prefix`/`--ext` given, only after the model and context prompts). GUI: missing, empty or non-folder `directory` → 400.
+Fails: CLI re-asks on invalid input; an invalid `-d` without `-a` → logged, exit 1 (with `--prefix`/`--ext` given, only after the model and context prompts). GUI: missing, empty or non-folder `directory` → 400. CLI with closed input (piped stdin, no `-a`) → "No input to answer the questions. Run with -a -d DIR …", exit 1.
 Module: `rename_files`, `app`
 
 ### 3. Discover patterns
@@ -90,7 +90,7 @@ Decides: which (prefix, extension) groups the folder offers, top 5 by count.
 In: folder. Out: `[((prefix, ext), count), …]`.
 Prefix = the leading run of letters, or of digits, or of symbols: `new2.txt` → `new`, `2024-notes.md` → `2024`, `newsletter.txt` → `newsletter`.
 Branches: files only; dot-files and names starting with `_` match nothing and are not counted.
-Fails: not a folder → `ValueError("Invalid directory")`.
+Fails: not a folder → `ValueError("Invalid directory")`; unreadable → "Can't read <folder>: <reason>". CLI logs either and exits 1; GUI answers 400.
 Module: `rename_files`
 
 ### 4. Select files
@@ -114,8 +114,8 @@ Decides: where originals are copied.
 Branches:
 - CLI: created once, after step 4 found ≥1 file, before any model call;
 - GUI: created by the first `/rename_file` of a run; JS sends its name back with every later file; a name that is not an existing `backup_*` folder in the request's folder → 400 "Backup folder is missing".
-No Ollama: created, then removed when no original was copied into it (CLI at the end of the run, GUI after each failed file).
-Stays empty: GUI when the first file succeeds with its own name (no copy); CLI on Ctrl+C.
+Removed when no original was copied into it: CLI when the run ends, Ctrl+C included; GUI after every file that failed or kept its own name.
+No Ollama: created, then removed.
 Fails: can't create (read-only folder) → "Can't create a backup folder in …": CLI logs it and exits 1 before any model call; GUI answers 400 and the row shows it.
 Module: `rename_files`, `app`
 
@@ -190,8 +190,8 @@ Module: `rename_files`, `static/script.js`
 
 ### GUI server start
 
-`ollama-rename gui [--port N] [--browser]`. Port: `--port`, else `FILE_RENAMER_PORT`, else 5000.
-Port busy → `GET /health`: another app → next free port within 50; a File Renamer → "Restart it? [y/N]" (No without a TTY) → SIGTERM and wait up to 5 s, or keep the old one and exit.
+`ollama-rename gui [--port N] [--browser]`. Port: `--port`, else `FILE_RENAMER_PORT`, else 5000. Outside 1–65535 → argparse error.
+Port busy → `GET /health`: another app → next free port within 50; a File Renamer → "Restart it? [y/N]" (No without a TTY) → SIGTERM and wait up to 5 s, or keep the old one and exit. No free port, or the old one still holds the port after 5 s → "Can't start File Renamer: …", exit 1.
 `--browser` → serve only and print the link. Linux without `qtpy` or `gi` → open the default browser. Else a pywebview window; closing it shuts the server down.
 Module: `app`
 

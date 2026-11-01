@@ -454,3 +454,42 @@ def test_interactive_cli_renames_after_yes(tmp_path, monkeypatch):
     (tmp_path / "new1.txt").write_text("hello")
     calls, _shown = _run_cli(tmp_path, monkeypatch, "y")
     assert len(calls) == 1 and (tmp_path / "doc-hello.txt").exists()
+
+
+def test_ctrl_c_mid_run_leaves_no_empty_backup_folder(tmp_path, monkeypatch):
+    async def interrupted(self, model, prompt, **_kwargs):
+        raise KeyboardInterrupt
+
+    monkeypatch.setattr("ollama_rename_files.rename_files.AsyncClient.generate", interrupted)
+    (tmp_path / "new1.txt").write_text("hello")
+    with pytest.raises(KeyboardInterrupt):
+        asyncio.run(InteractiveFileRenamer(base_dir=tmp_path, auto_mode=True).rename_files())
+    assert sorted(p.name for p in tmp_path.iterdir()) == ["new1.txt"]
+
+
+def _unreadable(monkeypatch):
+    def refuse(self):
+        raise PermissionError(13, "Permission denied", str(self))
+
+    monkeypatch.setattr("pathlib.Path.iterdir", refuse)
+
+
+def test_unreadable_folder_is_a_clear_error(tmp_path, monkeypatch):
+    _unreadable(monkeypatch)
+    renamer = InteractiveFileRenamer(base_dir=tmp_path)
+    for read in (renamer.discover_file_patterns, renamer.collect_files_to_rename):
+        with pytest.raises(ValueError, match="Can't read"):
+            read()
+
+
+def test_closed_input_ends_the_cli_with_a_hint(tmp_path, monkeypatch, capsys):
+    from ollama_rename_files import rename_files
+
+    def no_input(_prompt=""):
+        raise EOFError
+
+    monkeypatch.setattr("builtins.input", no_input)
+    with pytest.raises(SystemExit) as stop:
+        rename_files.run(["-d", str(tmp_path)])
+    assert stop.value.code == 1
+    assert "-a" in capsys.readouterr().out
