@@ -5,6 +5,8 @@ versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.3.4] - 2026-11-01
+
 ### Security
 
 - The desktop window's local server answers only requests addressed to `127.0.0.1` or `localhost`. Before, a web page
@@ -80,6 +82,7 @@ First tagged release.
 
 Untagged: the original CLI and the first pywebview GUI.
 
+[0.3.4]: https://github.com/octrow/ollama-rename-files/releases/tag/v0.3.4
 [0.3.3]: https://github.com/octrow/ollama-rename-files/releases/tag/v0.3.3
 [0.3.2]: https://github.com/octrow/ollama-rename-files/releases/tag/v0.3.2
 [0.3.1]: https://github.com/octrow/ollama-rename-files/releases/tag/v0.3.1
