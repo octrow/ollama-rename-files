@@ -41,7 +41,7 @@ No registry: the file suffix and the first bytes decide, in three places.
 | PDF | suffix `.pdf`, any case | 6 | pypdf text layer instead of raw bytes; empty text → file fails |
 | Binary or UTF-16 | a NUL byte in the first `context × 4` bytes | 6 | file fails, "only UTF-8 text and PDF files are supported" |
 | Text | any other file | 6 | strict UTF-8 decode; invalid bytes → file fails with the codec error |
-| Extension | `Path.suffix` of the original | 3, 4, 9 | discovery groups by lowercased last suffix; selection matches `name.lower().endswith(ext.lower())`; the new name keeps the original suffix, the model's extension is dropped |
+| Extension | `Path.suffix` of the original | 3, 4, 9 | discovery groups by lowercased last suffix; selection matches `name.lower().endswith(ext.lower())`, so a discovered group with no extension (`ext = ""`) selects every extension; the new name keeps the original suffix, the model's extension is dropped |
 
 Examples:
 - `report.PDF` with a text layer → PDF path, renamed to `<slug>.PDF`.
@@ -56,9 +56,9 @@ All entry points end in `InteractiveFileRenamer.analyze_and_rename` per file. Th
 
 | Entry | Folder | Pattern | Model | Context (chars) | Parallel | Before renaming |
 |---|---|---|---|---|---|---|
-| `ollama-rename` (no `-a`) | `-d`, else asked | `--prefix`/`--ext` (other one defaults), else menu of top 5; Enter = most common | `-m`, else menu of installed; Enter = first | `-c`, else asked; Enter = 2048, up to what the model's `context_length` holds | `-p`, default 0 → 1 | config summary, no file list, no confirm |
+| `ollama-rename` (no `-a`) | `-d`, else asked; Enter = current directory | `--prefix`/`--ext` (other one defaults), else menu of top 5; Enter = most common | `-m`, else menu of installed; Enter = first | `-c`, else asked; Enter = 2048, up to what the model's `context_length` holds | `-p`, default 0 → 1 | config summary, no file list, no confirm |
 | `ollama-rename -a -d DIR` | `-d` (required) | `--prefix new`, `--ext .txt` | `-m`, default `qwen2.5-coder:7b` | `-c`, default 2048 | `-p`, default 0 → 1 | nothing, starts at once |
-| `ollama-rename gui` | typed path or Browse; sent with every request | first discovered pattern pre-selected; a typed prefix switches to plain starts-with | dropdown of installed, first selected | fixed 2048 | 1 (JS loop) | file list shown; a prefix edit <250 ms before Rename still renames the old list |
+| `ollama-rename gui` | the folder of the last Scan (a typed path counts only after Scan), shown as `~/…`; sent with every request | first discovered pattern pre-selected; typing in the prefix or extension field switches to plain starts-with | dropdown of installed, first selected | fixed 2048 | 1 (JS loop) | file list shown; a field edit <250 ms before Rename renames the old list, and the pending preview then replaces the rows mid-run |
 
 Module: `__main__`, `rename_files`, `app`
 
@@ -81,7 +81,7 @@ Branches:
 - CLI without `-a` → asks only what the options left out: `-d` skips the folder, `--prefix` or `--ext` the pattern, `-m` the model, `-c` the context;
 - GUI → no server state: `/set_directory` checks the folder and discovers patterns; every `/preview` and `/rename_file` carries `directory`, plus prefix/extension or model.
 No Ollama: CLI prints "No Ollama models found. Using default model qwen2.5-coder:7b", the context prompt has no upper limit; GUI disables the model dropdown and the Rename button.
-Fails: CLI re-asks on invalid input; an invalid `-d` without `-a` → logged, exit 1. GUI: missing, empty or non-folder `directory` → 400.
+Fails: CLI re-asks on invalid input; an invalid `-d` without `-a` → logged, exit 1 (with `--prefix`/`--ext` given, only after the model and context prompts). GUI: missing, empty or non-folder `directory` → 400.
 Module: `rename_files`, `app`
 
 ### 3. Discover patterns
@@ -99,8 +99,10 @@ Decides: the exact list of files to rename.
 Rule: the name starts with the prefix (case-sensitive) and `name.lower().endswith(ext.lower())`, sorted by name.
 An extension without a dot gets one: `txt` → `.txt`, so `notes.mytxt` is not taken.
 Whole-word prefix: the next character must not continue the prefix's last letter or digit run, as in step 3: `new` takes `new1.txt`, `new.txt`, `new note.txt`, not `newsletter.txt`; `2024` skips `20240101.md`.
+Only letter and digit runs are checked: a symbol prefix `-` also takes `--y.txt`, which discovery counts as `--`.
 Branches:
-- empty prefix and empty extension (GUI fields cleared) → every file in the folder;
+- empty extension → any extension: GUI field cleared, `--ext ""`, Enter at "Write your pattern", or a discovered no-extension group: `new` (3 files, no extension) also takes `new4.txt` and `new_report.pdf`;
+- empty prefix and empty extension → every file in the folder; the CLI renames them with no list and no confirm;
 - GUI prefix typed by hand (`whole_prefix: false`) → plain starts-with: `new` takes `newsletter.txt`; the preview list shows it;
 - no matches → CLI logs "No files found to rename.", prints an all-zero summary and exits 0; GUI shows "No files match".
 Fails: invalid folder → CLI logs the error and exits 1.
@@ -114,6 +116,7 @@ Branches:
 - CLI: created once, after step 4 found ≥1 file, before any model call;
 - GUI: created by the first `/rename_file` of a run; JS sends its name back with every later file; a name that is not an existing `backup_*` folder in the request's folder → 400 "Backup folder is missing".
 No Ollama: created, then removed when no original was copied into it (CLI at the end of the run, GUI after each failed file).
+Stays empty: GUI when the first file succeeds with its own name (no copy); CLI on Ctrl+C.
 Fails: can't create (read-only folder) → "Can't create a backup folder in …": CLI logs it and exits 1 before any model call; GUI answers 400 and the row shows it.
 Module: `rename_files`, `app`
 
@@ -130,12 +133,12 @@ Module: `rename_files`
 ### 7. Ask the model
 
 Decides: the raw suggested name.
-`AsyncClient().generate(model, PROMPT_TEMPLATE, think=False, options={"num_predict": 128})`. Host from `OLLAMA_HOST`.
+`AsyncClient(timeout=300).generate(model, PROMPT_TEMPLATE, think=False, options={"num_predict": 128, "num_ctx": …})`. Host from `OLLAMA_HOST`.
 The prompt is fixed and tuned for software notes: `<type> - <action> - <component> - <description>.<ext>`, lowercase, ≤128 chars.
 `num_ctx` = (context chars + template) / 2 chars a token + 128, rounded up to 1024, at least 4096: 2048 chars → 4096, 20000 → 11264. One value per run, so the model loads once.
 Not capped by the model's trained length with `-c` or in the GUI; CJK text (~1 char a token) can still be cut.
 No Ollama: every file fails with "Ollama isn't reachable. Start it with `ollama serve` …".
-Fails: per file, no retry. Timeout 300 s (`ollama list`/`show`: 10 s) → "Ollama didn't answer in 300 s …". 404 → "Model X isn't installed. Run `ollama pull X`."; other errors → the error text.
+Fails: per file, no retry. Timeout 300 s per read, so GUI Stop can wait that long (`ollama list`/`show`: 10 s) → "Ollama didn't answer in 300 s …". 404 → "Model X isn't installed. Run `ollama pull X`."; other errors → the error text.
 Module: `rename_files`
 
 ### 8. Clean the reply
@@ -144,11 +147,13 @@ Drops `<think>…</think>` (or an unclosed `<think>` to the end) and lines start
 Per line: a `` `backticked` `` span wins; `*` and edge quotes go; a list marker (`1.`, `-`) and a short label (`File name:`) go.
 Takes the first line with a `-` or an `.ext` that doesn't end with `:`, lowercased.
 Branches: no such line ("Sure!", a bare `readme`) → this file fails with "model returned no file name".
+A chatty line with a dash is taken: "Here is a name for your file - hope it helps!" → `here-is-a-name-for-your-file-hope-it-helps`.
 Module: `rename_files`
 
 ### 9. Sanitize
 Decides: the final file name.
-In order: drop a trailing `.ext`; delete `` . ` ' , ; ``; replace `< > / \ | ? * : " + % ! @` with `_`; whitespace → `-`; collapse `--`; strip non-word characters at both ends; cut to `128 − len(suffix)` characters and to 255 bytes with the suffix.
+In order: drop a trailing `.ext`; delete `` . ` ' , ; ``; replace `< > / \ | ? * : " + % ! @` with `_`; whitespace → `-`; collapse `--`; strip non-word characters and `_` from the start; cut to `128 − len(suffix)` characters and to 255 bytes with the suffix; strip them from the end.
+`_` next to `-` stays: `task - fix: api` → `task-fix_-api`.
 Any script and leading digits stay: `заметка - про - бэкап` → `заметка-про-бэкап`, `2024 - q3 - report` → `2024-q3-report`.
 The first rule drops any trailing `.\w+`: `release-notes-v2.0` → `release-notes-v2`.
 Branches: no letter left (`""`, `123`) → `untitled-document-<8 hex>`.
@@ -207,4 +212,7 @@ Module: `rename_files`, `app`
 ## Known gaps
 
 Short list; details and fixes are in the plan (number in brackets).
-- None open.
+- A discovered no-extension group selects files of every extension; the CLI's Enter picks it (#13).
+- The interactive CLI renames without a file list or confirm: Enter at every prompt can take a whole folder, the current one by default (#14).
+- GUI: an edit just before Rename lets the pending preview replace the rows mid-run (#15).
+- A chatty reply line with a dash becomes the name (#16).
