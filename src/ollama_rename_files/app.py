@@ -24,6 +24,8 @@ from ollama_rename_files.rename_files import DEFAULT_MODEL, InteractiveFileRenam
 
 APP_ID = "ollama-rename-files"
 HOST = "127.0.0.1"
+# The API renames files anywhere on disk: only the local page may call it, not a DNS-rebinding web page
+ALLOWED_HOSTS = {HOST, "localhost"}
 DEFAULT_PORT = int(os.environ.get("FILE_RENAMER_PORT", "5000"))
 PORT_SEARCH_RANGE = 50
 HEALTH_TIMEOUT_S = 1.0
@@ -63,6 +65,13 @@ def _display_path(path: Path) -> str:
         return "~/" + path.resolve().relative_to(Path.home().resolve()).as_posix()
     except ValueError:
         return str(path)
+
+
+@app.before_request
+def refuse_foreign_host():
+    if request.host.rsplit(":", 1)[0] not in ALLOWED_HOSTS:
+        return jsonify({"error": "Forbidden host"}), 403
+    return None
 
 
 @app.route("/")

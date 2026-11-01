@@ -97,3 +97,11 @@ def test_set_directory_shows_home_as_tilde(tmp_path, monkeypatch):
     response = gui.app.test_client().post("/set_directory", json={"directory": "~/inbox"})
     assert response.json is not None
     assert response.json["directory"] == "~/inbox"
+
+
+def test_requests_from_other_hosts_are_refused(tmp_path):
+    # DNS rebinding: a web page served from evil.example resolves to 127.0.0.1 and calls the API
+    client = gui.app.test_client()
+    response = client.post("/set_directory", json={"directory": str(tmp_path)}, headers={"Host": "evil.example:5000"})
+    assert response.status_code == 403
+    assert client.get("/health", headers={"Host": "127.0.0.1:5000"}).status_code == 200
