@@ -5,11 +5,23 @@ versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.3.1] - 2026-11-01
+
 ### Fixed
 
 - PDF files are renamed by their text instead of failing with `'utf-8' codec can't decode byte 0xe2`
   ([#2](https://github.com/octrow/ollama-rename-files/issues/2)). Binary files, encrypted or broken PDFs and PDFs
   without a text layer fail with a clear reason instead of stopping the whole run.
+- A backup never overwrites an earlier backup of a file with the same name in the backup directory
+  ([#6](https://github.com/octrow/ollama-rename-files/issues/6)).
+- A file the model names exactly as it is already named is left alone instead of getting a `-1` suffix and a needless
+  backup ([#8](https://github.com/octrow/ollama-rename-files/issues/8)).
+
+### Security
+
+- Standalone builds ship pypdf 6.21.4 (CVE-2026-119203 to CVE-2026-119209,
+  [#13](https://github.com/octrow/ollama-rename-files/issues/13)) and certifi 2026.10.19 (PYSEC-2026-4320,
+  [#3](https://github.com/octrow/ollama-rename-files/issues/3)).
 
 ## [0.3.0] - 2026-10-16
 
@@ -43,4 +55,5 @@ First tagged release.
 
 Untagged: the original CLI and the first pywebview GUI.
 
+[0.3.1]: https://github.com/octrow/ollama-rename-files/releases/tag/v0.3.1
 [0.3.0]: https://github.com/octrow/ollama-rename-files/releases/tag/v0.3.0
