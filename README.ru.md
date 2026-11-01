@@ -3,6 +3,7 @@
 <p align="center">
   <a href="https://github.com/octrow/ollama-rename-files/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/octrow/ollama-rename-files/actions/workflows/ci.yml/badge.svg"></a>
   <a href="https://github.com/octrow/ollama-rename-files/releases/latest"><img alt="Последний релиз" src="https://img.shields.io/github/v/release/octrow/ollama-rename-files"></a>
+  <a href="https://pypi.org/project/ollama-rename-files/"><img alt="PyPI" src="https://img.shields.io/pypi/v/ollama-rename-files"></a>
   <img alt="Python 3.10+" src="https://img.shields.io/badge/python-3.10%2B-blue">
   <a href="LICENSE"><img alt="Лицензия MIT" src="https://img.shields.io/github/license/octrow/ollama-rename-files"></a>
 </p>
