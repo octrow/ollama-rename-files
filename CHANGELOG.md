@@ -5,6 +5,8 @@ versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.3.7] - 2026-11-01
+
 ### Fixed
 
 - An empty `backup_<timestamp>/` folder was left when the window renamed a file to the name it already had, and when
@@ -138,6 +140,7 @@ First tagged release.
 
 Untagged: the original CLI and the first pywebview GUI.
 
+[0.3.7]: https://github.com/octrow/ollama-rename-files/releases/tag/v0.3.7
 [0.3.6]: https://github.com/octrow/ollama-rename-files/releases/tag/v0.3.6
 [0.3.5]: https://github.com/octrow/ollama-rename-files/releases/tag/v0.3.5
 [0.3.4]: https://github.com/octrow/ollama-rename-files/releases/tag/v0.3.4
