@@ -33,8 +33,6 @@ RESTART_TIMEOUT_S = 5.0
 
 logger = logging.getLogger(__name__)
 app = Flask(__name__)
-# ponytail: single-user desktop app, one module-level "current folder" is enough
-current_dir: Path | None = None
 
 
 class Api:
@@ -45,17 +43,26 @@ class Api:
         return result[0] if result else None
 
 
-def _child(name: str | None) -> Path | None:
-    """Path of an existing entry in current_dir; None for missing names or anything that isn't a bare name."""
-    if not current_dir or not name or Path(name).name != name:
+def _folder(data: dict) -> Path | None:
+    """The folder a request names. Every request carries it, so two tabs never act on each other's folder."""
+    raw = data.get("directory")
+    if not raw or not isinstance(raw, str):
         return None
-    path = current_dir / name
+    path = Path(raw).expanduser()
+    return path if path.is_dir() else None
+
+
+def _child(folder: Path, name: str | None) -> Path | None:
+    """Path of an existing entry in folder; None for missing names or anything that isn't a bare name."""
+    if not name or Path(name).name != name:
+        return None
+    path = folder / name
     return path if path.exists() else None
 
 
-def _backup_dir(name: str | None) -> Path | None:
-    """The run's backup folder, if the name points at one inside current_dir."""
-    path = _child(name)
+def _backup_dir(folder: Path, name: str | None) -> Path | None:
+    """The run's backup folder, if the name points at one inside folder."""
+    path = _child(folder, name)
     return path if path and path.is_dir() and path.name.startswith("backup_") else None
 
 
@@ -86,11 +93,9 @@ def health():
 
 @app.post("/set_directory")
 def set_directory():
-    directory = Path((request.get_json(silent=True) or {}).get("directory", "")).expanduser()
-    if not directory.is_dir():
+    directory = _folder(request.get_json(silent=True) or {})
+    if not directory:
         return jsonify({"error": "That folder doesn't exist. Check the path and scan again."}), 400
-    global current_dir
-    current_dir = directory
     patterns = InteractiveFileRenamer(base_dir=directory).discover_file_patterns()
     return jsonify({"directory": _display_path(directory), "patterns": patterns})
 
@@ -102,30 +107,35 @@ def models():
 
 @app.post("/preview")
 def preview():
-    if not current_dir:
-        return jsonify({"error": "Choose a folder first."}), 400
     data = request.get_json(silent=True) or {}
+    folder = _folder(data)
+    if not folder:
+        return jsonify({"error": "Choose a folder first."}), 400
     renamer = InteractiveFileRenamer(
-        base_dir=current_dir,
+        base_dir=folder,
         filename_prefix=data.get("prefix", ""),
         filename_extension=data.get("extension", ""),
     )
-    return jsonify([p.name for p in renamer.collect_files_to_rename()])
+    # a picked pattern matches like discovery counted it; a typed prefix is a plain "starts with"
+    return jsonify([p.name for p in renamer.collect_files_to_rename(bool(data.get("whole_prefix", True)))])
 
 
 @app.post("/rename_file")
 def rename_file():
     """Rename one file. The first call of a run creates the backup folder; later calls pass its name back."""
     data = request.get_json(silent=True) or {}
-    path = _child(data.get("file"))
+    folder = _folder(data)
+    if not folder:
+        return jsonify({"error": "The folder is gone. Scan it again."}), 400
+    path = _child(folder, data.get("file"))
     if not path or not path.is_file():
         return jsonify({"error": "File not found in the chosen folder."}), 400
-    backup_dir = _backup_dir(data.get("backup_dir"))
+    backup_dir = _backup_dir(folder, data.get("backup_dir"))
     if data.get("backup_dir") and not backup_dir:
         return jsonify({"error": "Backup folder is missing. Start the run again."}), 400
 
     renamer = InteractiveFileRenamer(
-        base_dir=current_dir,
+        base_dir=folder,
         model_name=data.get("model") or DEFAULT_MODEL,
         backup_dir=backup_dir,
     )

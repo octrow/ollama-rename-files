@@ -8,6 +8,7 @@ import sys
 import textwrap
 import uuid
 from collections import Counter
+from collections.abc import Collection
 from datetime import datetime
 from pathlib import Path
 
@@ -50,6 +51,19 @@ PROMPT_TEMPLATE = textwrap.dedent("""\
     """)
 
 FailedFiles = list[tuple[str, str]]
+
+
+def _same_run(a: str, b: str) -> bool:
+    """Discovery keeps two letters or two digits in one prefix run (`new2` → `new`, `newsletter` stays whole)."""
+    return (a.isalpha() and b.isalpha()) or (a.isdecimal() and b.isdecimal())
+
+
+def matches_prefix(name: str, prefix: str, whole_prefix: bool = True) -> bool:
+    """`new` takes new1.txt and new.txt; with whole_prefix it skips newsletter.txt, as discovery counts it."""
+    if not name.startswith(prefix):
+        return False
+    rest = name[len(prefix) :]
+    return not (whole_prefix and prefix and rest and _same_run(prefix[-1], rest[0]))
 
 
 def clean_model_response(text: str) -> str:
@@ -221,15 +235,20 @@ class InteractiveFileRenamer:
             logger.warning(f"Could not retrieve model info: {e}")
         return DEFAULT_CONTEXT_LENGTH
 
-    def interactive_configuration(self) -> None:
+    def interactive_configuration(self, given: Collection[str] = ()) -> None:
+        """Ask for every setting except those in `given` (option names set on the command line)."""
         if self.auto_mode:
             return
-        self.base_dir = self._interactive_directory_selection()
-        self.filename_prefix, self.filename_extension = self._interactive_file_pattern_selection(
-            self.discover_file_patterns()
-        )
-        self.model_name = self._interactive_model_selection(list_ollama_models())
-        self.context_length = self._interactive_context_selection(self._get_model_max_context(self.model_name))
+        if "directory" not in given:
+            self.base_dir = self._interactive_directory_selection()
+        if not {"prefix", "ext"} & set(given):
+            self.filename_prefix, self.filename_extension = self._interactive_file_pattern_selection(
+                self.discover_file_patterns()
+            )
+        if "model" not in given:
+            self.model_name = self._interactive_model_selection(list_ollama_models())
+        if "context" not in given:
+            self.context_length = self._interactive_context_selection(self._get_model_max_context(self.model_name))
         self._print_summary()
 
     @staticmethod
@@ -297,14 +316,16 @@ class InteractiveFileRenamer:
         logger.info(f"Renamed: {file_path.name} -> {new_file_path.name}")
         return True, new_file_path.name
 
-    def collect_files_to_rename(self) -> list[Path]:
+    def collect_files_to_rename(self, whole_prefix: bool = True) -> list[Path]:
         if not self.base_dir or not self.base_dir.is_dir():
             raise ValueError(f"Invalid directory: {self.base_dir}")
         ext = self.filename_extension.lower()
         return sorted(
             p
             for p in self.base_dir.iterdir()
-            if p.is_file() and p.name.startswith(self.filename_prefix) and p.name.lower().endswith(ext)
+            if p.is_file()
+            and matches_prefix(p.name, self.filename_prefix, whole_prefix)
+            and p.name.lower().endswith(ext)
         )
 
     async def rename_files(self, parallel_count: int = 0) -> tuple[int, int, FailedFiles]:
@@ -343,18 +364,34 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         "-a", "--auto", action="store_true", help="Run in auto mode without interactive prompts (requires -d)"
     )
     parser.add_argument("-d", "--directory", help="Specify directory non-interactively")
-    parser.add_argument("-m", "--model", default=DEFAULT_MODEL, help="Specify the Ollama model")
+    parser.add_argument("-m", "--model", help=f"Specify the Ollama model (default {DEFAULT_MODEL})")
     parser.add_argument(
-        "-c", "--context", type=int, default=DEFAULT_CONTEXT_LENGTH, help="Characters of each file to send to the model"
+        "-c",
+        "--context",
+        type=int,
+        help=f"Characters of each file to send to the model (default {DEFAULT_CONTEXT_LENGTH})",
     )
-    parser.add_argument("--prefix", default=DEFAULT_PREFIX, help="Specify the file prefix")
-    parser.add_argument("--ext", default=DEFAULT_EXTENSION, help="Specify the file extension")
+    parser.add_argument(
+        "--prefix", help=f"File prefix, matched as a whole word: `new` skips newsletter.txt (default {DEFAULT_PREFIX})"
+    )
+    parser.add_argument("--ext", help=f"Specify the file extension (default {DEFAULT_EXTENSION})")
     parser.add_argument(
         "-p", "--parallel", type=int, default=0, help="Number of parallel rename operations (default: sequential)"
     )
     args = parser.parse_args(argv)
     if args.auto and not args.directory:
         parser.error("--auto requires --directory")
+    # options set on the command line are not asked again in interactive mode
+    defaults = {
+        "model": DEFAULT_MODEL,
+        "context": DEFAULT_CONTEXT_LENGTH,
+        "prefix": DEFAULT_PREFIX,
+        "ext": DEFAULT_EXTENSION,
+    }
+    args.given = {name for name in ("directory", *defaults) if getattr(args, name) is not None}
+    for name, default in defaults.items():
+        if getattr(args, name) is None:
+            setattr(args, name, default)
     return args
 
 
@@ -368,8 +405,8 @@ async def _main(argv: list[str] | None) -> None:
         filename_prefix=args.prefix,
         filename_extension=args.ext,
     )
-    renamer.interactive_configuration()
     try:
+        renamer.interactive_configuration(args.given)
         renamed_count, failed_count, failed_files = await renamer.rename_files(args.parallel)
     except ValueError as e:
         logger.error(str(e))

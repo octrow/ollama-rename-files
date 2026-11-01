@@ -1,7 +1,8 @@
 const $ = (id) => document.getElementById(id);
 const PREVIEW_DELAY_MS = 250;
 
-const state = {files: [], running: false, stopRequested: false, previewTimer: null};
+// directory: the folder last scanned, sent with every request; wholePrefix: a picked pattern, not a typed prefix
+const state = {files: [], running: false, stopRequested: false, previewTimer: null, directory: null, wholePrefix: true};
 
 function showStatus(text, isError = false) {
     $('status').textContent = text;
@@ -53,6 +54,7 @@ function buildChip(prefix, ext, count, checked) {
 }
 
 function usePattern(prefix, extension) {
+    state.wholePrefix = true;
     $('prefix').value = prefix;
     $('extension').value = extension;
     preview();
@@ -61,6 +63,7 @@ function usePattern(prefix, extension) {
 async function scan(directory) {
     try {
         const result = await postJson('/set_directory', {directory});
+        state.directory = result.directory;
         $('directory').value = result.directory;
         renderPatterns(result.patterns);
         if (result.patterns.length) usePattern(...result.patterns[0][0]);
@@ -74,7 +77,7 @@ async function scan(directory) {
 /** Re-count patterns after a run, keeping the finished old → new list on screen. */
 async function refreshPatterns() {
     try {
-        const result = await postJson('/set_directory', {directory: $('directory').value});
+        const result = await postJson('/set_directory', {directory: state.directory});
         renderPatterns(result.patterns);
         document.querySelectorAll('input[name="pattern"]').forEach((r) => { r.checked = false; });
     } catch (error) {
@@ -127,6 +130,8 @@ function setRow(file, rowState, text = '') {
 async function preview() {
     try {
         const names = await postJson('/preview', {
+            directory: state.directory,
+            whole_prefix: state.wholePrefix,
             prefix: $('prefix').value,
             extension: $('extension').value,
         });
@@ -137,6 +142,7 @@ async function preview() {
 }
 
 function schedulePreview() {
+    state.wholePrefix = false;
     clearTimeout(state.previewTimer);
     state.previewTimer = setTimeout(preview, PREVIEW_DELAY_MS);
     document.querySelectorAll('input[name="pattern"]').forEach((r) => { r.checked = false; });
@@ -181,7 +187,7 @@ function setInputsLocked(locked) {
 async function renameOne(file, model, backupDir) {
     setRow(file, 'working');
     try {
-        const result = await postJson('/rename_file', {file: file.name, model, backup_dir: backupDir});
+        const result = await postJson('/rename_file', {directory: state.directory, file: file.name, model, backup_dir: backupDir});
         setRow(file, result.ok ? 'done' : 'failed', result.ok ? result.new_name : result.error);
         return result.backup_dir;
     } catch (error) {

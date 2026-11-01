@@ -5,6 +5,17 @@ versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+
+- The desktop window renamed files in the folder scanned last, by any tab. With two tabs open (`--browser`, or the
+  browser fallback on Linux), renaming in one tab changed files in the other tab's folder. Each request now names its
+  folder, and an empty path is refused instead of meaning the server's working directory.
+- Without `-a`, the CLI ignored `-d`, `-m`, `-c`, `--prefix` and `--ext` and asked for everything again; pressing Enter
+  picked the first installed model instead of `-m`. Options you pass are no longer asked.
+- The prefix `new` also renamed `news.txt` and `newsletter.txt`, which pattern discovery counts as other groups. A
+  picked pattern, `--prefix` and the CLI menu now match the prefix as a whole word; a prefix typed in the desktop window
+  still matches any name that starts with it.
+
 ## [0.3.4] - 2026-11-01
 
 ### Security

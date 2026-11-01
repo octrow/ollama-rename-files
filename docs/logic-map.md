@@ -56,9 +56,9 @@ All entry points end in `InteractiveFileRenamer.analyze_and_rename` per file. Th
 
 | Entry | Folder | Pattern | Model | Context (chars) | Parallel | Before renaming |
 |---|---|---|---|---|---|---|
-| `ollama-rename` (no `-a`) | asked; **`-d` ignored** | menu of top 5; Enter = most common; **`--prefix`/`--ext` ignored** | menu of installed; Enter = first; **`-m` ignored** | asked; Enter = model's `context_length` from `ollama show`; **`-c` ignored** | `-p`, default 0 → 1 | config summary, no file list, no confirm |
+| `ollama-rename` (no `-a`) | `-d`, else asked | `--prefix`/`--ext` (other one defaults), else menu of top 5; Enter = most common | `-m`, else menu of installed; Enter = first | `-c`, else asked; Enter = model's `context_length` from `ollama show` | `-p`, default 0 → 1 | config summary, no file list, no confirm |
 | `ollama-rename -a -d DIR` | `-d` (required) | `--prefix new`, `--ext .txt` | `-m`, default `qwen2.5-coder:7b` | `-c`, default 2048 | `-p`, default 0 → 1 | nothing, starts at once |
-| `ollama-rename gui` | typed path or Browse | first discovered pattern pre-selected, editable | dropdown of installed, first selected | fixed 2048 | 1 (JS loop) | file list shown; a prefix edit <250 ms before Rename still renames the old list |
+| `ollama-rename gui` | typed path or Browse; sent with every request | first discovered pattern pre-selected; a typed prefix switches to plain starts-with | dropdown of installed, first selected | fixed 2048 | 1 (JS loop) | file list shown; a prefix edit <250 ms before Rename still renames the old list |
 
 Module: `__main__`, `rename_files`, `app`
 
@@ -78,10 +78,10 @@ Module: `__main__`
 Decides: folder, prefix, extension, model, context length.
 Branches:
 - CLI `-a` → takes flags as they are; `-a` without `-d` → argparse error;
-- CLI without `-a` → four prompts that overwrite `-d`, `--prefix`, `--ext`, `-m`, `-c` (see Entry points);
-- GUI → `POST /set_directory` stores one module-level `current_dir`, shared by every tab and read when each request arrives; prefix/extension come with each `/preview`, model with each `/rename_file`.
+- CLI without `-a` → asks only what the options left out: `-d` skips the folder, `--prefix` or `--ext` the pattern, `-m` the model, `-c` the context;
+- GUI → no server state: `/set_directory` checks the folder and discovers patterns; every `/preview` and `/rename_file` carries `directory`, plus prefix/extension or model.
 No Ollama: CLI prints "No Ollama models found. Using default model qwen2.5-coder:7b", context falls back to 2048; GUI disables the model dropdown and the Rename button.
-Fails: CLI re-asks on invalid input; GUI answers 400 "That folder doesn't exist", but an empty path is `.` and scans the server's working directory.
+Fails: CLI re-asks on invalid input; an invalid `-d` without `-a` → logged, exit 1. GUI: missing, empty or non-folder `directory` → 400.
 Module: `rename_files`, `app`
 
 ### 3. Discover patterns
@@ -96,10 +96,11 @@ Module: `rename_files`
 ### 4. Select files
 
 Decides: the exact list of files to rename.
-Rule: `name.startswith(prefix)` (case-sensitive) and `name.lower().endswith(ext.lower())`, sorted by name.
+Rule: the name starts with the prefix (case-sensitive) and `name.lower().endswith(ext.lower())`, sorted by name.
+Whole-word prefix: the next character must not continue the prefix's last letter or digit run, as in step 3: `new` takes `new1.txt`, `new.txt`, `new note.txt`, not `newsletter.txt`; `2024` skips `20240101.md`.
 Branches:
 - empty prefix and empty extension (GUI fields cleared) → every file in the folder;
-- prefix `new` also takes `newsletter.txt`, which discovery counted as a separate group;
+- GUI prefix typed by hand (`whole_prefix: false`) → plain starts-with: `new` takes `newsletter.txt`; the preview list shows it;
 - no matches → CLI logs "No files found to rename.", prints an all-zero summary and exits 0; GUI shows "No files match".
 Fails: invalid folder → CLI logs the error and exits 1.
 Module: `rename_files`
@@ -110,7 +111,7 @@ Decides: where originals are copied.
 `backup_YYYYMMDD_HHMMSS/` inside the folder; `-1`, `-2` suffix if the name exists.
 Branches:
 - CLI: created once, after step 4 found ≥1 file, before any model call;
-- GUI: created by the first `/rename_file` of a run; JS sends its name back with every later file; a name that is not an existing `backup_*` folder in `current_dir` → 400 "Backup folder is missing".
+- GUI: created by the first `/rename_file` of a run; JS sends its name back with every later file; a name that is not an existing `backup_*` folder in the request's folder → 400 "Backup folder is missing".
 No Ollama: still created, stays empty.
 Fails: can't create (read-only folder) → CLI traceback (only `ValueError` is caught); GUI HTML 500, every row shows a JSON parse error.
 Module: `rename_files`, `app`
@@ -190,7 +191,8 @@ Module: `app`
 ### GUI request guard
 
 Every request with a Host other than `127.0.0.1` or `localhost` → 403 (DNS rebinding). The server binds 127.0.0.1 only.
-`/rename_file` accepts only a bare name of an existing file in `current_dir`; anything with a path → 400.
+`/rename_file` accepts only a bare name of an existing file in the folder the request names; anything with a path → 400.
+A cross-site form POST can't send JSON, so it gets 400 and changes nothing.
 Feeds: steps 2, 5, 10.
 Module: `app`
 
@@ -203,11 +205,8 @@ Module: `rename_files`, `app`
 ## Known gaps
 
 Short list; details and fixes are in the plan (number in brackets).
-- CLI without `-a` ignores `-d`, `-m`, `-c`, `--prefix`, `--ext` (#1).
-- Prefix `new` also renames `newsletter.txt`, and the CLI renames without showing the list (#2).
 - Empty text files are sent to the model and renamed to an invented name (#3).
 - Context length is chosen in characters but Ollama's own context window is never set; CLI default is the model's token maximum (#4).
-- GUI resolves every request against one global folder: a second tab or an empty-path POST redirects the renames (#8).
 - Non-Latin text is cut from both ends: all-Cyrillic → `untitled-document-…`, `2024-q3-report` → `q3-report` (#5).
 - A chatty first line of the reply becomes the file name (#6).
 - Concurrent GUI requests can overwrite each other's target (#9).

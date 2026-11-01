@@ -15,14 +15,51 @@ def _client(tmp_path):
 
 def test_preview_lists_matching_files(tmp_path):
     client = _client(tmp_path)
-    assert client.post("/preview", json={"prefix": "new", "extension": ".txt"}).json == ["new1.txt"]
+    request = {"directory": str(tmp_path), "prefix": "new", "extension": ".txt"}
+    assert client.post("/preview", json=request).json == ["new1.txt"]
+
+
+def test_preview_of_a_picked_pattern_skips_longer_words(tmp_path):
+    client = _client(tmp_path)
+    (tmp_path / "newsletter.txt").write_text("x")
+    request = {"directory": str(tmp_path), "prefix": "new", "extension": ".txt"}
+    assert client.post("/preview", json={**request, "whole_prefix": True}).json == ["new1.txt"]
+    assert client.post("/preview", json={**request, "whole_prefix": False}).json == ["new1.txt", "newsletter.txt"]
+
+
+def test_each_request_uses_the_folder_it_names(tmp_path, monkeypatch):
+    # two tabs: A scanned x, then B scanned y; A's rename must still happen in x
+    async def fake_generate(self, model, prompt, **_kwargs):
+        return {"response": "doc-hello.md"}
+
+    monkeypatch.setattr("ollama_rename_files.rename_files.AsyncClient.generate", fake_generate)
+    x, y = tmp_path / "x", tmp_path / "y"
+    for folder in (x, y):
+        folder.mkdir()
+        (folder / "new1.txt").write_text("hello")
+    client = gui.app.test_client()
+    for folder in (x, y):
+        assert client.post("/set_directory", json={"directory": str(folder)}).status_code == 200
+
+    result = client.post("/rename_file", json={"directory": str(x), "file": "new1.txt"}).json
+
+    assert result["ok"] and (x / "doc-hello.txt").exists()
+    assert sorted(p.name for p in y.iterdir()) == ["new1.txt"]
+
+
+def test_requests_without_a_folder_are_refused(tmp_path):
+    client = _client(tmp_path)
+    assert client.post("/set_directory", data="directory=").status_code == 400
+    assert client.post("/set_directory", json={"directory": ""}).status_code == 400
+    assert client.post("/preview", json={"prefix": "new", "extension": ".txt"}).status_code == 400
+    assert client.post("/rename_file", json={"file": "new1.txt"}).status_code == 400
 
 
 def test_rename_file_rejects_paths_outside_folder(tmp_path):
     client = _client(tmp_path)
     for name in ("../etc/passwd", "/etc/passwd", "missing.txt"):
-        assert client.post("/rename_file", json={"file": name}).status_code == 400
-    bad_backup = client.post("/rename_file", json={"file": "new1.txt", "backup_dir": ".."})
+        assert client.post("/rename_file", json={"directory": str(tmp_path), "file": name}).status_code == 400
+    bad_backup = client.post("/rename_file", json={"directory": str(tmp_path), "file": "new1.txt", "backup_dir": ".."})
     assert bad_backup.status_code == 400
 
 
@@ -32,10 +69,12 @@ def test_rename_file_renames_and_reuses_backup(tmp_path, monkeypatch):
 
     monkeypatch.setattr("ollama_rename_files.rename_files.AsyncClient.generate", fake_generate)
     client = _client(tmp_path)
-    first = client.post("/rename_file", json={"file": "new1.txt"}).json
+    folder = str(tmp_path)
+    first = client.post("/rename_file", json={"directory": folder, "file": "new1.txt"}).json
     assert first["ok"] and first["new_name"] == "doc-hello.txt"
     (tmp_path / "new2.txt").write_text("again")
-    second = client.post("/rename_file", json={"file": "new2.txt", "backup_dir": first["backup_dir"]}).json
+    request = {"directory": folder, "file": "new2.txt", "backup_dir": first["backup_dir"]}
+    second = client.post("/rename_file", json=request).json
     assert second["backup_dir"] == first["backup_dir"]
     assert sorted(p.name for p in (tmp_path / first["backup_dir"]).iterdir()) == ["new1.txt", "new2.txt"]
 

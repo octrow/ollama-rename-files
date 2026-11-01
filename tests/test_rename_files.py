@@ -1,5 +1,7 @@
 import asyncio
 
+import pytest
+
 from ollama_rename_files.rename_files import (
     InteractiveFileRenamer,
     clean_model_response,
@@ -51,6 +53,51 @@ def test_parse_args_defaults_are_not_none():
 
     args = parse_args(["-a", "-d", "."])
     assert None not in (args.model, args.context, args.prefix, args.ext)
+
+
+def test_cli_options_skip_their_prompts(tmp_path, monkeypatch):
+    from ollama_rename_files.rename_files import parse_args
+
+    monkeypatch.setattr("builtins.input", lambda _prompt="": pytest.fail("must not ask"))
+    args = parse_args(["-d", str(tmp_path), "-m", "tiny:1b", "-c", "500", "--prefix", "draft", "--ext", ".md"])
+    renamer = InteractiveFileRenamer(
+        base_dir=args.directory,
+        model_name=args.model,
+        context_length=args.context,
+        filename_prefix=args.prefix,
+        filename_extension=args.ext,
+    )
+    renamer.interactive_configuration(args.given)
+    assert (renamer.base_dir, renamer.model_name, renamer.context_length) == (tmp_path, "tiny:1b", 500)
+    assert (renamer.filename_prefix, renamer.filename_extension) == ("draft", ".md")
+
+
+def test_cli_asks_only_what_the_options_left_out(tmp_path, monkeypatch):
+    from ollama_rename_files.rename_files import parse_args
+
+    (tmp_path / "new1.txt").write_text("x")
+    prompts = []
+    monkeypatch.setattr("builtins.input", lambda prompt="": prompts.append(prompt) or "")
+    monkeypatch.setattr("ollama_rename_files.rename_files.list_ollama_models", lambda: ["first:1b", "second:1b"])
+    monkeypatch.setattr(InteractiveFileRenamer, "_get_model_max_context", lambda self, model: 4096)
+    args = parse_args(["-d", str(tmp_path), "-m", "second:1b"])
+    renamer = InteractiveFileRenamer(base_dir=args.directory, model_name=args.model)
+
+    renamer.interactive_configuration(args.given)
+
+    assert len(prompts) == 2  # pattern and context; folder and model came from the options
+    assert (renamer.base_dir, renamer.model_name, renamer.context_length) == (tmp_path, "second:1b", 4096)
+    assert (renamer.filename_prefix, renamer.filename_extension) == ("new", ".txt")
+
+
+def test_collect_skips_longer_words_with_the_same_start(tmp_path):
+    for name in ("new.txt", "new1.txt", "new note.txt", "news.txt", "newsletter.txt", "2024.md", "20240101.md"):
+        (tmp_path / name).write_text("x")
+    new = InteractiveFileRenamer(base_dir=tmp_path, auto_mode=True)
+    year = InteractiveFileRenamer(base_dir=tmp_path, filename_prefix="2024", filename_extension=".md")
+    assert [p.name for p in new.collect_files_to_rename()] == ["new note.txt", "new.txt", "new1.txt"]
+    assert [p.name for p in year.collect_files_to_rename()] == ["2024.md"]
+    assert len(new.collect_files_to_rename(whole_prefix=False)) == 5
 
 
 def test_clean_model_response_handles_truncated_think():

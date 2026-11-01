@@ -108,16 +108,17 @@ system GTK bindings (`python3-gi`). Windows and macOS work out of the box.
 ### Command line
 
 ```bash
-# Interactive: asks for the folder, the file pattern, the model and the context length
+# Interactive: asks for the folder, the file pattern, the model and the context length.
+# Options you pass on the command line are not asked again.
 ollama-rename
 
-# A folder, a model and 500 characters of each file
+# A folder, a model and 500 characters of each file; asks only for the file pattern
 ollama-rename -d ~/notes/inbox -m qwen2.5-coder:7b -c 500
 
 # No prompts: every new*.txt file in the folder
 ollama-rename -a -d ~/notes/inbox --prefix new --ext .txt
 
-# Four files at a time
+# Four files at a time; asks for everything but the folder
 ollama-rename -d ~/notes/inbox -p 4
 ```
 
@@ -127,7 +128,7 @@ ollama-rename -d ~/notes/inbox -p 4
 | `--directory` | `-d`  | Folder with the files to rename.                                                |
 | `--model`     | `-m`  | Ollama model to use (default `qwen2.5-coder:7b`).                               |
 | `--context`   | `-c`  | How many characters of each file to send to the model (default 2048).           |
-| `--prefix`    |       | File name prefix to match (default `new`). Used with `--ext` as the pattern.    |
+| `--prefix`    |       | File name prefix to match (default `new`): `new` takes `new1.txt` and `new.txt`, not `newsletter.txt`. Used with `--ext` as the pattern. |
 | `--ext`       |       | File extension to match, with the dot (default `.txt`).                         |
 | `--parallel`  | `-p`  | Files renamed at the same time. 0 (default) means one by one.                   |
 
@@ -135,7 +136,8 @@ Ollama on another machine or port? Set `OLLAMA_HOST`, e.g. `OLLAMA_HOST=http://1
 
 ## How it works
 
-1. Finds the files in the folder that match the pattern (prefix and extension).
+1. Finds the files in the folder that match the pattern: the prefix as a whole word (`new` takes `new1.txt`, not
+   `newsletter.txt`) and the extension. A prefix typed in the desktop window matches any name that starts with it.
 2. Creates `backup_<timestamp>/` in that folder and copies each file there before renaming it.
 3. Sends the first `--context` characters of the file (for a PDF, of its extracted text) to your local Ollama model.
 4. Cleans the suggested name: lowercase, safe characters, at most 128 characters.
