@@ -5,6 +5,13 @@ versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.3.9] - 2026-11-05
+
+### Changed
+
+- Docs only, no code changes: the README is refreshed (shorter, plain language), and the repo gets a logic map
+  (`docs/logic-map.md`), a plan of known logic gaps and a test that checks the map's `Module:` lines.
+
 ## [0.3.8] - 2026-11-02
 
 ### Fixed
@@ -148,6 +155,7 @@ First tagged release.
 
 Untagged: the original CLI and the first pywebview GUI.
 
+[0.3.9]: https://github.com/octrow/ollama-rename-files/releases/tag/v0.3.9
 [0.3.8]: https://github.com/octrow/ollama-rename-files/releases/tag/v0.3.8
 [0.3.7]: https://github.com/octrow/ollama-rename-files/releases/tag/v0.3.7
 [0.3.6]: https://github.com/octrow/ollama-rename-files/releases/tag/v0.3.6
