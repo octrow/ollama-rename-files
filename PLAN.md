@@ -32,3 +32,4 @@
 - [docs/plans/2026-11-01-logic-map-fixes.md](docs/plans/2026-11-01-logic-map-fixes.md): находки карты логики, порядок работы, живой прогон
 - [docs/system-design.md](docs/system-design.md): ступень, расчёт нагрузки, отказы, риски (2026-11-05); сводка по всем репо: `~/dev/docs/system-design-report-2026-11-05.md`
 - [docs/logic-map.md](docs/logic-map.md), [docs/logic-map.ru.md](docs/logic-map.ru.md): карта логики
+- [docs/skills-roadmap-2026-11-05.md](docs/skills-roadmap-2026-11-05.md): навыки с рынка вакансий, 2 пункта: structured output Ollama через Pydantic; фикстуры формата имени без живой Ollama
