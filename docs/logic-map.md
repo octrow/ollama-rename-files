@@ -40,7 +40,7 @@ No registry: the file suffix and the first bytes decide, in three places.
 |---|---|---|---|
 | PDF | suffix `.pdf`, any case | 6 | pypdf text layer instead of raw bytes; empty text → file fails |
 | Binary or UTF-16 | a NUL byte in the first `context × 4` bytes | 6 | file fails, "only UTF-8 text and PDF files are supported" |
-| Text | any other file | 6 | strict UTF-8 decode; invalid bytes → file fails with the codec error |
+| Text | any other file | 6 | strict UTF-8 decode; invalid bytes → file fails with the codec error (UTF-16 with no NUL byte, e.g. all-CJK, fails here too) |
 | Extension | `Path.suffix` of the original | 3, 4, 9 | discovery groups by lowercased last suffix; selection matches `name.lower().endswith(ext.lower())`; an empty extension means none for a picked pattern and in the CLI, any for a GUI field typed by hand; the new name keeps the original suffix, the model's extension is dropped |
 
 Examples:
@@ -56,9 +56,9 @@ All entry points end in `InteractiveFileRenamer.analyze_and_rename` per file. Th
 
 | Entry | Folder | Pattern | Model | Context (chars) | Parallel | Before renaming |
 |---|---|---|---|---|---|---|
-| `ollama-rename` (no `-a`) | `-d`, else asked; Enter = current directory | `--prefix`/`--ext` (other one defaults), else menu of top 5; Enter = most common | `-m`, else menu of installed; Enter = first | `-c`, else asked; Enter = 2048, up to what the model's `context_length` holds | `-p`, default 0 → 1 | file list (first 20), then `Rename N files? [y/N]`; only y/yes/д/да renames |
+| `ollama-rename` (no `-a`) | `-d`, else asked; Enter = current directory | `--prefix`/`--ext` (other one defaults), else menu of top 5; Enter = most common | `-m`, else menu of installed; Enter = first | `-c`, else asked; Enter = 2048 (less if the model's `context_length` holds less), up to what it holds | `-p`, default 0 → 1 | file list (first 20), then `Rename N files? [y/N]`; only y/yes/д/да renames |
 | `ollama-rename -a -d DIR` | `-d` (required) | `--prefix new`, `--ext .txt` | `-m`, default `qwen2.5-coder:7b` | `-c`, default 2048 | `-p`, default 0 → 1 | nothing, starts at once |
-| `ollama-rename gui` | the folder of the last Scan (a typed path counts only after Scan), shown as `~/…`; sent with every request | first discovered pattern pre-selected; typing in the prefix or extension field switches to plain starts-with, empty extension = any | dropdown of installed, first selected | fixed 2048 | 1 (JS loop) | file list shown; a field edit <250 ms before Rename renames the old list; the pending preview is cancelled |
+| `ollama-rename gui` | the folder of the last Scan (a typed path counts only after Scan), shown as `~/…`; sent with every request | first discovered pattern pre-selected; typing in the prefix or extension field switches to plain starts-with, empty extension = any | dropdown of installed, first selected | fixed 2048 | 1 (JS loop) | file list shown; a field edit <250 ms before Rename renames the old list; the pending preview is cancelled, but a preview or Scan already sent still lands mid-run [20] |
 
 Module: `__main__`, `rename_files`, `app`
 
@@ -103,6 +103,7 @@ Only letter and digit runs are checked: a symbol prefix `-` also takes `--y.txt`
 Branches:
 - empty extension, for a picked pattern or in the CLI (`--ext ""`, Enter at "Write your pattern") → files without an extension: the `new` (no extension) group takes `new1`, not `new4.txt`;
 - GUI fields typed by hand (`as_discovered: false`) → plain starts-with, and an empty extension means any: `new` takes `newsletter.txt`; both empty → every file in the folder; the preview list shows it;
+- CLI without `-a` collects the list twice: once to show and confirm, again after the answer, so a file added meanwhile is renamed unshown [21];
 - no matches → CLI logs "No files found to rename.", prints an all-zero summary and exits 0; GUI shows "No files match".
 Fails: invalid folder → CLI logs the error and exits 1.
 Module: `rename_files`
@@ -174,15 +175,15 @@ Module: `rename_files`
 Decides: order, concurrency, and what the user sees.
 Branches:
 - CLI without `-a`: lists the files and asks `Rename N files? [y/N]` first; anything but yes → "Nothing renamed.", exit 0;
-- CLI: `asyncio.gather` over all files with `Semaphore(max(-p, 1))`; logs progress every 10 files; prints totals and each failed file with its reason; exit 0 even when files failed;
-- GUI: JS posts one `/rename_file` per row, in order; Stop takes effect after the current file; status bar shows counts and the backup folder; patterns are re-discovered after the run, the renamed list stays on screen.
-Ctrl+C in the CLI prints "Operation interrupted by user." with no summary; files done so far stay renamed.
+- CLI: `asyncio.gather` over all files with `Semaphore(max(-p, 1))`; logs progress every 10 files; prints totals and each failed file with its reason; exit 0 even when every file failed [22];
+- GUI: JS posts one `/rename_file` per row, in order, reading `state.directory` anew for each [20]; Stop takes effect after the current file; status bar shows counts and the backup folder; patterns are re-discovered after the run, the renamed list stays on screen.
+Ctrl+C in the CLI prints "Operation interrupted by user." with no summary, exit 0; files done so far stay renamed.
 Module: `rename_files`, `app`, `static/script.js`
 
 ### Output
 
 Renamed files in the same folder, originals in `backup_<timestamp>/`.
-CLI: "Renaming Operation Summary" with processed / renamed / failed counts and reasons.
+CLI: "Renaming Operation Summary" with processed / renamed / failed counts and reasons; a file that kept its own name counts as renamed [24].
 GUI: each row shows `old → new` or the error; status line "Renamed N files, M failed. Originals are in backup_…".
 Module: `rename_files`, `static/script.js`
 
@@ -191,7 +192,7 @@ Module: `rename_files`, `static/script.js`
 ### GUI server start
 
 `ollama-rename gui [--port N] [--browser]`. Port: `--port`, else `FILE_RENAMER_PORT`, else 5000. Outside 1–65535 → argparse error.
-Port busy → `GET /health`: another app → next free port within 50; a File Renamer → "Restart it? [y/N]" (No without a TTY) → SIGTERM and wait up to 5 s, or keep the old one and exit. No free port, or the old one still holds the port after 5 s → "Can't start File Renamer: …", exit 1.
+Port busy → `GET /health`: another app → next free port within 50 (a search past 65535 raises `OverflowError`, a traceback [23]); a File Renamer → "Restart it? [y/N]" (No without a TTY) → SIGTERM and wait up to 5 s, or keep the old one and exit. No free port, or the old one still holds the port after 5 s → "Can't start File Renamer: …", exit 1.
 `--browser` → serve only and print the link. Linux without `qtpy` or `gi` → open the default browser. Else a pywebview window; closing it shuts the server down.
 Module: `app`
 
@@ -212,4 +213,8 @@ Module: `rename_files`, `app`
 ## Known gaps
 
 Short list; details and fixes are in the plan (number in brackets).
-- None open.
+- [20] GUI: a preview or Scan answer that lands after Rename swaps the rows or the folder mid-run (MEDIUM).
+- [21] Interactive CLI renames the list collected after the answer, not the one shown (LOW).
+- [22] CLI exits 0 when every file failed and on Ctrl+C (LOW, question).
+- [23] GUI port search past 65535 → traceback (LOW).
+- [24] A file that kept its own name counts as renamed (LOW, question).
