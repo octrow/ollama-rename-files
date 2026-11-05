@@ -221,3 +221,11 @@ def test_no_free_port_ends_with_a_message(monkeypatch, capsys):
         gui.run(["--port", "5000"])
     assert stop.value.code == 1
     assert "No free port" in capsys.readouterr().out
+
+
+def test_next_free_port_stays_within_max_port(monkeypatch):
+    probed = []
+    monkeypatch.setattr(gui, "port_is_free", lambda port: probed.append(port) or False)
+    with pytest.raises(RuntimeError):
+        gui.next_free_port(gui.MAX_PORT)
+    assert probed == [gui.MAX_PORT]

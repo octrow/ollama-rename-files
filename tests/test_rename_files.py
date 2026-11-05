@@ -505,3 +505,9 @@ def test_clean_model_response_skips_chatty_lines_with_a_dash():
         == "bug fix - update - auth - token refresh.md"
     )
     assert clean_model_response("task-fix-api.md") == "task-fix-api.md"
+
+
+def test_choose_rejects_unicode_digit_without_crashing(monkeypatch):
+    answers = iter(["²", "2"])
+    monkeypatch.setattr("builtins.input", lambda _: next(answers))
+    assert InteractiveFileRenamer._choose("? ", 3) == 2

@@ -192,7 +192,7 @@ Module: `rename_files`, `static/script.js`
 ### GUI server start
 
 `ollama-rename gui [--port N] [--browser]`. Port: `--port`, else `FILE_RENAMER_PORT`, else 5000. Outside 1–65535 → argparse error.
-Port busy → `GET /health`: another app → next free port within 50 (a search past 65535 raises `OverflowError`, a traceback [23]); a File Renamer → "Restart it? [y/N]" (No without a TTY) → SIGTERM and wait up to 5 s, or keep the old one and exit. No free port, or the old one still holds the port after 5 s → "Can't start File Renamer: …", exit 1.
+Port busy → `GET /health`: another app → next free port within 50, never past 65535; a File Renamer → "Restart it? [y/N]" (No without a TTY) → SIGTERM and wait up to 5 s, or keep the old one and exit. No free port, or the old one still holds the port after 5 s → "Can't start File Renamer: …", exit 1.
 `--browser` → serve only and print the link. Linux without `qtpy` or `gi` → open the default browser. Else a pywebview window; closing it shuts the server down.
 Module: `app`
 
@@ -216,5 +216,4 @@ Short list; details and fixes are in the plan (number in brackets).
 - [20] GUI: a preview or Scan answer that lands after Rename swaps the rows or the folder mid-run (MEDIUM).
 - [21] Interactive CLI renames the list collected after the answer, not the one shown (LOW).
 - [22] CLI exits 0 when every file failed and on Ctrl+C (LOW, question).
-- [23] GUI port search past 65535 → traceback (LOW).
 - [24] A file that kept its own name counts as renamed (LOW, question).

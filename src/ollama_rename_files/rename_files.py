@@ -262,7 +262,7 @@ class InteractiveFileRenamer:
             choice = input(prompt).strip()
             if not choice:
                 return None
-            if choice.isdigit() and 1 <= int(choice) <= count:
+            if choice.isdecimal() and 1 <= int(choice) <= count:
                 return int(choice)
             print("Invalid selection. Please try again.")
 

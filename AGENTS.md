@@ -2,7 +2,8 @@
 
 1. `docs/logic-map.md`: how a folder of files becomes renamed files: every step, every branch, the module behind it.
 2. `docs/plans/`: work in progress; `2026-11-01-logic-map-fixes.md` lists the known logic gaps.
-3. `CONTRIBUTING.md`: setup, tests, commit format.
+3. Open bugs, plans and ideas: [PLAN.md](PLAN.md).
+4. `CONTRIBUTING.md`: setup, tests, commit format.
 
 Rules:
 - Change a step or a branch → update `docs/logic-map.md` and `docs/logic-map.ru.md` in the same commit.

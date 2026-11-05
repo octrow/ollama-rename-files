@@ -186,10 +186,11 @@ def running_instance_pid(port: int) -> int | None:
 
 
 def next_free_port(start: int) -> int:
-    for port in range(start, start + PORT_SEARCH_RANGE):
+    last = min(start + PORT_SEARCH_RANGE - 1, MAX_PORT)
+    for port in range(start, last + 1):
         if port_is_free(port):
             return port
-    raise RuntimeError(f"No free port in {start}-{start + PORT_SEARCH_RANGE - 1}")
+    raise RuntimeError(f"No free port in {start}-{last}")
 
 
 def confirm(question: str) -> bool:

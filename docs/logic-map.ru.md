@@ -191,7 +191,7 @@ Module: `rename_files`, `static/script.js`
 ### Запуск сервера GUI
 
 `ollama-rename gui [--port N] [--browser]`. Порт: `--port`, иначе `FILE_RENAMER_PORT`, иначе 5000. Вне 1–65535 → ошибка argparse.
-Порт занят → `GET /health`: чужое приложение → следующий свободный в пределах 50; File Renamer → «Restart it? [y/N]» (без TTY — No) → SIGTERM и ожидание до 5 с, или оставить старый и выйти. Нет свободного порта или старый экземпляр держит порт дольше 5 с → «Can't start File Renamer: …», выход 1.
+Порт занят → `GET /health`: чужое приложение → следующий свободный в пределах 50, не выше 65535; File Renamer → «Restart it? [y/N]» (без TTY — No) → SIGTERM и ожидание до 5 с, или оставить старый и выйти. Нет свободного порта или старый экземпляр держит порт дольше 5 с → «Can't start File Renamer: …», выход 1.
 `--browser` → только сервер и ссылка. Linux без `qtpy` или `gi` → браузер по умолчанию. Иначе окно pywebview; закрытие окна гасит сервер.
 Module: `app`
 
