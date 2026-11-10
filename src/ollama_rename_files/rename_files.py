@@ -537,6 +537,9 @@ async def _main(argv: list[str] | None) -> None:
         print("\nFiles that failed to rename:")
         for file, error in failed_files:
             print(f"  - {file}: {error}")
+        # A printed summary is not enough for scripts: a run with failures
+        # must be visible in the exit code (see logic-map [22]).
+        sys.exit(1)
 
 
 def run(argv: list[str] | None = None) -> None:

@@ -175,7 +175,7 @@ Module: `rename_files`
 Decides: order, concurrency, and what the user sees.
 Branches:
 - CLI without `-a`: lists the files and asks `Rename N files? [y/N]` first; anything but yes → "Nothing renamed.", exit 0;
-- CLI: `asyncio.gather` over all files with `Semaphore(max(-p, 1))`; logs progress every 10 files; prints totals and each failed file with its reason; exit 0 even when every file failed [22];
+- CLI: `asyncio.gather` over all files with `Semaphore(max(-p, 1))`; logs progress every 10 files; prints totals and each failed file with its reason; exit 1 when any file failed [22];
 - GUI: JS posts one `/rename_file` per row, in order, reading `state.directory` anew for each [20]; Stop takes effect after the current file; status bar shows counts and the backup folder; patterns are re-discovered after the run, the renamed list stays on screen.
 Ctrl+C in the CLI prints "Operation interrupted by user." with no summary, exit 0; files done so far stay renamed.
 Module: `rename_files`, `app`, `static/script.js`
@@ -215,5 +215,5 @@ Module: `rename_files`, `app`
 Short list; details and fixes are in the plan (number in brackets).
 - [20] GUI: a preview or Scan answer that lands after Rename swaps the rows or the folder mid-run (MEDIUM).
 - [21] Interactive CLI renames the list collected after the answer, not the one shown (LOW).
-- [22] CLI exits 0 when every file failed and on Ctrl+C (LOW, question).
+- [22] CLI exits 0 on Ctrl+C (LOW, question); the failed-files half is fixed: exit 1 when any file failed.
 - [24] A file that kept its own name counts as renamed (LOW, question).

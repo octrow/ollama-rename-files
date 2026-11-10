@@ -511,3 +511,32 @@ def test_choose_rejects_unicode_digit_without_crashing(monkeypatch):
     answers = iter(["²", "2"])
     monkeypatch.setattr("builtins.input", lambda _: next(answers))
     assert InteractiveFileRenamer._choose("? ", 3) == 2
+
+
+def test_cli_exits_1_when_a_file_failed(tmp_path, monkeypatch):
+    from ollama_rename_files import rename_files
+
+    async def fake_generate(self, model, prompt, **_kwargs):
+        return {"response": "doc-hello.md"}
+
+    monkeypatch.setattr("ollama_rename_files.rename_files.AsyncClient.generate", fake_generate)
+    (tmp_path / "new1.txt").write_text("hello")
+    (tmp_path / "new2.txt").write_bytes(b"\x00binary")
+    argv = ["-a", "-d", str(tmp_path), "-m", "tiny:1b", "--prefix", "new", "--ext", ".txt"]
+    with pytest.raises(SystemExit) as stop:
+        asyncio.run(rename_files._main(argv))
+    assert stop.value.code == 1
+    assert (tmp_path / "doc-hello.txt").exists()
+
+
+def test_cli_exits_0_when_every_file_renamed(tmp_path, monkeypatch):
+    from ollama_rename_files import rename_files
+
+    async def fake_generate(self, model, prompt, **_kwargs):
+        return {"response": "doc-hello.md"}
+
+    monkeypatch.setattr("ollama_rename_files.rename_files.AsyncClient.generate", fake_generate)
+    (tmp_path / "new1.txt").write_text("hello")
+    argv = ["-a", "-d", str(tmp_path), "-m", "tiny:1b", "--prefix", "new", "--ext", ".txt"]
+    asyncio.run(rename_files._main(argv))  # no SystemExit: exit 0
+    assert (tmp_path / "doc-hello.txt").exists()
